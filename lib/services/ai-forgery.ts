@@ -35,15 +35,21 @@ export async function detectForgery(file: File): Promise<ForgeryAnalysisResult> 
         });
 
         const base64Content = base64Data.split(',')[1];
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
         const prompt = `
-        Analyze this image strictly for signs of digital forgery or manipulation.
-        Focus on:
-        1. Inconsistent fonts or typefaces.
-        2. Pixelation artifacts around text (indicates copy-paste).
-        3. Alignment issues or unnatural spacing.
-        4. Color inconsistencies in the background pattern.
+        Analyze this document image strictly for signs of MALICIOUS digital forgery or manipulation.
+        
+        CRITICAL CONTEXT: This is likely a digital certificate (e.g., from an online course) or an invoice. 
+        It is extremely common and perfectly normal for the recipient's name, serial number, or date to be 
+        superimposed/rendered onto a static background template by software. 
+        DO NOT flag the document as forged simply because the text anti-aliasing, font, or pixel crispness of 
+        the specific data fields (like Name or Course Title) differs slightly from the background template.
+
+        Only flag as forged if you see:
+        1. Obvious, sloppy copy-paste boxes (mismatched background colors behind text).
+        2. Signs that existing text was erased/cloned over and replaced.
+        3. Severe visual anomalies that clearly indicate malicious human tampering rather than standard software PDF generation.
 
         Do NOT extract the text content (OCR). Your job is only to judge authenticity.
 

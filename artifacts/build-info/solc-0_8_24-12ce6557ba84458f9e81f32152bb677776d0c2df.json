@@ -1,0 +1,35 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_24-12ce6557ba84458f9e81f32152bb677776d0c2df",
+  "solcVersion": "0.8.24",
+  "solcLongVersion": "0.8.24+commit.e11b9ed9",
+  "userSourceNameMap": {
+    "contracts/LuxLedgerRegistry.sol": "project/contracts/LuxLedgerRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "shanghai",
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode",
+            "evm.deployedBytecode",
+            "evm.methodIdentifiers",
+            "metadata"
+          ]
+        }
+      },
+      "remappings": []
+    },
+    "sources": {
+      "project/contracts/LuxLedgerRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.24;\r\n\r\n/**\r\n * @title LuxLedgerRegistry\r\n * @notice On-chain registry for luxury asset authenticity certificates.\r\n *         Stores Keccak256 hashes of asset metadata, enabling tamper-proof verification.\r\n * @dev Deployed on Polygon Amoy testnet.\r\n */\r\ncontract LuxLedgerRegistry {\r\n    struct Asset {\r\n        bytes32 dataHash;\r\n        address issuer;\r\n        uint256 timestamp;\r\n        string metadataURI;\r\n        bool exists;\r\n    }\r\n\r\n    /// @notice Mapping from data hash to Asset record\r\n    mapping(bytes32 => Asset) public assets;\r\n\r\n    /// @notice Array of all registered data hashes (for enumeration)\r\n    bytes32[] public allHashes;\r\n\r\n    /// @notice Mapping from issuer address to their registered hashes\r\n    mapping(address => bytes32[]) public issuerHashes;\r\n\r\n    /// @notice Total number of assets registered\r\n    uint256 public assetCount;\r\n\r\n    /// @notice Emitted when a new asset is registered\r\n    event AssetRegistered(\r\n        bytes32 indexed dataHash,\r\n        address indexed issuer,\r\n        uint256 timestamp,\r\n        string metadataURI\r\n    );\r\n\r\n    /**\r\n     * @notice Register a new luxury asset on-chain.\r\n     * @param dataHash Keccak256 hash of the asset's metadata (name, serial, model, etc.)\r\n     * @param metadataURI Optional IPFS/Arweave URI pointing to full metadata\r\n     */\r\n    function registerAsset(bytes32 dataHash, string calldata metadataURI) external {\r\n        require(!assets[dataHash].exists, \"Asset already registered\");\r\n\r\n        assets[dataHash] = Asset({\r\n            dataHash: dataHash,\r\n            issuer: msg.sender,\r\n            timestamp: block.timestamp,\r\n            metadataURI: metadataURI,\r\n            exists: true\r\n        });\r\n\r\n        allHashes.push(dataHash);\r\n        issuerHashes[msg.sender].push(dataHash);\r\n        assetCount++;\r\n\r\n        emit AssetRegistered(dataHash, msg.sender, block.timestamp, metadataURI);\r\n    }\r\n\r\n    /**\r\n     * @notice Verify if an asset hash exists on-chain.\r\n     * @param dataHash The hash to look up\r\n     * @return exists Whether the hash is registered\r\n     * @return issuer The address that registered it\r\n     * @return timestamp When it was registered\r\n     * @return metadataURI The associated metadata URI\r\n     */\r\n    function verifyAsset(bytes32 dataHash) external view returns (\r\n        bool exists,\r\n        address issuer,\r\n        uint256 timestamp,\r\n        string memory metadataURI\r\n    ) {\r\n        Asset memory a = assets[dataHash];\r\n        return (a.exists, a.issuer, a.timestamp, a.metadataURI);\r\n    }\r\n\r\n    /**\r\n     * @notice Get all asset hashes registered by a specific issuer.\r\n     * @param issuer The issuer address to query\r\n     * @return hashes Array of data hashes registered by this issuer\r\n     */\r\n    function getAssetsByIssuer(address issuer) external view returns (bytes32[] memory) {\r\n        return issuerHashes[issuer];\r\n    }\r\n\r\n    /**\r\n     * @notice Get full asset details by hash.\r\n     * @param dataHash The asset hash\r\n     */\r\n    function getAsset(bytes32 dataHash) external view returns (Asset memory) {\r\n        return assets[dataHash];\r\n    }\r\n}\r\n"
+      }
+    }
+  }
+}

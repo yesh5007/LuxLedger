@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Shield, UserCircle2, Building2, FileSearch } from "lucide-react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from 'wagmi'
+import { TopNav } from "@/components/ui/top-nav";
 
 export default function Home() {
   const { open } = useWeb3Modal();
@@ -11,23 +12,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      <header className="border-b bg-white">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Shield className="h-6 w-6 text-amber-600" />
-            <span className="text-xl font-bold font-serif">LuxLedger</span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <Button onClick={() => open()} variant="outline">
-              {address ? <div className="flex gap-2 items-center">
-                <UserCircle2 className="h-8 w-8 mr-2" />
-                {address.slice(0, 6)}...{address.slice(-4)}
-              </div> : "Connect Wallet"}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <TopNav />
 
       <main className="flex-1 flex flex-col items-center justify-center p-6">
         <div className="text-center max-w-2xl mb-12">

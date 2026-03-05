@@ -1,782 +1,148 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
+"use client"
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Shield,
-  FileText,
-  Users,
-  Settings,
-  LogOut,
-  Plus,
-  Search,
-  Download,
-  Eye,
-  MoreHorizontal,
-  FileCheck,
-  UserCircle2,
-} from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LayoutDashboard, Loader2, ExternalLink, Clock, Fingerprint, CheckCircle2, Shield } from "lucide-react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
-import { useAccount, useWalletClient } from "wagmi";
-import { SubmitHandler, useForm } from "react-hook-form";
-import axios from "axios";
-import { ethers } from "ethers";
-import { abi } from "@/lib/contract";
+import { useAccount } from 'wagmi';
+import { useState, useEffect } from "react";
+import { getRegisteredAssetsByIssuer, RegisteredAssetEvent } from "@/lib/services/blockchain-service";
+import { TopNav } from "@/components/ui/top-nav";
 
-type InstitutionData = [
-  [institutionAddress: string, metadata: string],
-  [
-    docHash: string,
-    issuer: string,
-    issuedAt: bigint,
-    revoked: boolean,
-    ipfsURI: string
-  ][]
-];
-
-export default function Dashboard() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  const { isConnected, address } = useAccount();
-
-  const { data: client } = useWalletClient();
-
-  const [institution, setInstitution] = useState<InstitutionData | null>(null);
-  const [institutionDetails, setInstitutionDetails] = useState<{
-    name: string;
-    documents: {
-      recipient: {
-        fullName: string;
-        email: string;
-        id: string;
-        walletAddress: string;
-      };
-      document: {
-        type: string;
-        id: string;
-        hash: string;
-        description: string;
-      };
-      issuedAt: bigint;
-      status: boolean;
-    }[];
-  } | null>(null);
+export default function DashboardPage() {
+  const { open } = useWeb3Modal();
+  const { address, isConnected } = useAccount();
+  const [assets, setAssets] = useState<RegisteredAssetEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadInstitution = async () => {
-      try {
-        if (!client?.transport || !address) return;
-
-        const provider = new ethers.BrowserProvider(client.transport);
-        const signer = await provider.getSigner();
-
-        const contract = new ethers.Contract(
-          "0xA09916427843c35a233BF355bFAF1C735F9e75fa",
-          abi,
-          signer
-        );
-
-        const result: [
-          [institutionAddress: string, metadata: string],
-          [
-            docHash: string,
-            issuer: string,
-            issuedAt: bigint,
-            revoked: boolean,
-            ipfsURI: string
-          ][]
-        ] = await contract.getInstitutionWithDocuments(
-          address
-        );
-
-        const metadataResponse = await axios.get("/api/register", {
-          params: {
-            cid: result[0][1].replace("ipfs://", ""), // institution metadata CID
-          },
-        });
-
-        console.log(metadataResponse);
-
-        const documentsMetadata: {
-          recipient: {
-            fullName: string;
-            email: string;
-            id: string;
-            walletAddress: string;
-          };
-          document: {
-            type: string;
-            id: string;
-            hash: string;
-            description: string;
-          };
-          issuedAt: bigint;
-          status: boolean;
-        }[] = await Promise.all(
-          result[1].slice(2).map(async (doc) => {
-            const docResponse = await axios.get("/api/register", {
-              params: {
-                cid: doc[4], // document IPFS URI
-              },
-            });
-            return {
-              ...docResponse.data["data"],
-              issuedAt: doc[2],
-              status: doc[3],
-            };
-          })
-        );
-
-        setInstitution(result);
-        setInstitutionDetails({
-          name: metadataResponse.data["data"]["name"],
-          documents: documentsMetadata,
-        });
-      } catch (error) {
-        console.log(error);
-      }
-    };
-
-    loadInstitution();
-  }, [client]);
-
-  const [newDocumentOpened, setNewDocumentOpened] = useState(false);
-
-  const { data: walletClient } = useWalletClient();
-
-  const onRevoke = async (hash: string) => {
-    try {
-      if (!walletClient) {
-        return;
-      }
-
-      // console.log(data);
-      // setLoading(true);
-
-      // console.log(await connector?.getProvider())
-
-      // Convert to EIP-1193 provider
-      const provider = new ethers.BrowserProvider(walletClient.transport);
-      const signer = await provider.getSigner();
-      console.log(signer);
-      // const feeData = await provider.get();
-
-      // console.log(feeData)
-
-      // // Connect to contract
-      const contract = new ethers.Contract(
-        "0xA09916427843c35a233BF355bFAF1C735F9e75fa",
-        abi, // Your contract ABI
-        signer
-      );
-
-      // const estimatedGas = await contract.getAddress;
-
-      // console.log(await contract.issueDocument.staticCallResult("hash", "cid"))
-
-      // Sign and send transaction
-      const gas = await contract.revokeDocument.estimateGas(hash);
-      const tx = await contract.revokeDocument(hash, {
-        gasLimit: gas + gas / 40n,
-      });
-      await tx.wait();
-
-      // // Handle successful transaction
-      console.log("Transaction successful:", tx.hash);
-
-      setInstitutionDetails((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          documents: prev.documents.map((doc) => {
-            if (doc.document.hash === hash) {
-              return {
-                ...doc,
-                status: true
-              };
-            }
-            return doc;
-          })
-        };
-      });
-
-      // setLoading(false);
-    } catch (error) {
-      console.log(error);
+    if (isConnected && address) {
+      fetchMyAssets(address);
+    } else {
+      setIsLoading(false);
     }
+  }, [isConnected, address]);
 
-    // Handle form submission
+  const fetchMyAssets = async (userAddress: string) => {
+    setIsLoading(true);
+    const result = await getRegisteredAssetsByIssuer(userAddress);
+    if (result.success && result.assets) {
+      setAssets(result.assets);
+    } else {
+      console.error("Failed to fetch dashboard assets:", result.error);
+    }
+    setIsLoading(false);
   };
 
-  if (!isConnected) {
-    return <LoginForm />;
-  }
-
   return (
-    <div className="flex min-h-screen">
-      <aside className="hidden md:flex w-64 flex-col border-r bg-muted/40">
-        <div className="flex h-14 items-center border-b px-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold">
-            <div className="flex items-center gap-2 font-bold text-xl">
-              <span>LuxLedger</span>
-            </div>
-          </Link>
-        </div>
-        <nav className="flex-1 overflow-auto py-4">
-          <div className="px-4 mb-4">
-            <h2 className="mb-2 px-2 text-xs font-semibold tracking-tight">
-              Dashboard
-            </h2>
-            <div className="space-y-1">
-              <Button variant="ghost" className="w-full justify-start gap-2">
-                <FileText className="h-4 w-4" />
-                Documents
-              </Button>
-            </div>
-          </div>
-        </nav>
-        <div className="mt-auto border-t p-4">
-          <Button
-            variant="ghost"
-            className="w-full justify-start gap-2"
-            onClick={() => setIsLoggedIn(false)}
-          >
-            <LogOut className="h-4 w-4" />
-            Logout
-          </Button>
-        </div>
-      </aside>
-      <div className="flex flex-col flex-1">
-        <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:px-6">
-          <div className="md:hidden">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
-              <div className="flex items-center gap-2 font-bold">
-                <span>LuxLedger</span>
-              </div>
-            </Link>
-          </div>
-          <div className="w-full flex-1">
-            <form>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search documents..."
-                  className="w-full bg-background pl-8 md:w-[300px] lg:w-[400px]"
-                />
-              </div>
-            </form>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="h-8 gap-1">
-              <span className="sr-only md:not-sr-only md:inline">
-                {institutionDetails ? institutionDetails.name : "Loading..."}
-              </span>
-            </Button>
-          </div>
-        </header>
-        <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-semibold md:text-2xl">
-              Document Management
+    <div className="flex flex-col min-h-screen bg-slate-50">
+      <TopNav />
+
+      <main className="flex-1 container py-10 max-w-5xl mx-auto">
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2 font-serif flex items-center gap-2">
+              <LayoutDashboard className="h-7 w-7 text-amber-600" />
+              Issuer Dashboard
             </h1>
-            <Dialog open={newDocumentOpened}>
-              <DialogTrigger asChild>
-                <Button
-                  onClick={() => setNewDocumentOpened(true)}
-                  className="gap-1"
-                >
-                  <Plus className="h-4 w-4" />
-                  New Document
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Issue New Document</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details to create and issue a new official
-                    document.
-                  </DialogDescription>
-                </DialogHeader>
-                <NewDocumentForm
-                  onNewDocumentAdd={(newData: {
-                    recipient: {
-                      fullName: string;
-                      email: string;
-                      id: string;
-                      walletAddress: string;
-                    };
-                    document: {
-                      type: string;
-                      id: string;
-                      hash: string;
-                      description: string;
-                    };
-                    issuedAt: bigint;
-                    status: boolean;
-                  }) =>
-                    setInstitutionDetails((prev) =>
-                      prev
-                        ? {
-                          name: prev.name,
-                          documents: prev.documents.concat(newData),
-                        }
-                        : null
-                    )
-                  }
-                  onClose={() => setNewDocumentOpened(false)}
-                />
-              </DialogContent>
-            </Dialog>
+            <p className="text-muted-foreground">
+              Manage and review your personally issued, cryptographically secured assets.
+            </p>
           </div>
-          <Tabs defaultValue="all" className="w-full">
-            <TabsContent value="all" className="border rounded-md mt-6">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Recipient</TableHead>
-                    <TableHead>Issue Date</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {institutionDetails ? (
-                    institutionDetails.documents.map((doc) => (
-                      <TableRow key={doc.document.id}>
-                        <TableCell className="font-medium">
-                          {doc.document.hash}
-                        </TableCell>
-                        <TableCell>{doc.document.type}</TableCell>
-                        <TableCell>{doc.recipient.fullName}</TableCell>
-                        <TableCell>
-                          {new Date(
-                            Number(doc.issuedAt) * 1000
-                          ).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`h-2 w-2 rounded-full ${doc.status ? "bg-red-500" : "bg-green-500"
-                                }`}
-                            ></div>
-                            <span>{doc.status ? "Revoked" : "Issued"}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                                <span className="sr-only">Actions</span>
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={() => void onRevoke(doc.document.hash)}
-                                className="text-destructive"
-                              >
-                                Revoke
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
+          {isConnected && (
+            <Button onClick={() => address && fetchMyAssets(address)} variant="outline" disabled={isLoading} className="shadow-sm">
+              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LayoutDashboard className="w-4 h-4 mr-2" />}
+              Sync Ledger
+            </Button>
+          )}
+        </div>
+
+        {!isConnected ? (
+          <div className="bg-white rounded-xl shadow-sm border p-12 text-center flex flex-col items-center">
+            <Shield className="h-16 w-16 text-slate-300 mb-4" />
+            <h2 className="text-xl font-bold mb-2">Wallet Disconnected</h2>
+            <p className="text-slate-500 mb-6 max-w-sm">Please connect your authorized issuer wallet to access your private dashboard and transaction history.</p>
+            <Button onClick={() => open()} className="bg-amber-600 hover:bg-amber-700">Connect to Dashboard</Button>
+          </div>
+        ) : (
+          <div className="bg-white shadow-sm rounded-xl border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-slate-50 text-slate-600 border-b text-xs uppercase tracking-wider font-semibold">
+                  <tr>
+                    <th className="px-6 py-4">Issuance Date</th>
+                    <th className="px-6 py-4">Document Fingerprint (SHA-256)</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Polygon Amoy Scan</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                        <Loader2 className="w-8 h-8 mx-auto animate-spin mb-2 text-amber-600" />
+                        <p>Syncing personal transactions from the blockchain...</p>
+                      </td>
+                    </tr>
+                  ) : assets.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                        You have not issued any documents using this wallet address yet.
+                        <div className="mt-4">
+                          <Link href="/issuer">
+                            <Button variant="default" className="bg-amber-600 hover:bg-amber-700">
+                              Issue Your First Asset
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
                   ) : (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center">
-                        Loading...
-                      </TableCell>
-                    </TableRow>
+                    assets.map((asset, index) => (
+                      <tr key={index} className="border-b last:border-0 hover:bg-slate-50 transition">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2 text-slate-600">
+                            <Clock className="w-4 h-4 opacity-50" />
+                            <span className="font-medium">
+                              {new Date(asset.timestamp * 1000).toLocaleDateString()}
+                            </span>
+                            <span className="text-xs opacity-70">
+                              {new Date(asset.timestamp * 1000).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Fingerprint className="w-4 h-4 text-emerald-600 opacity-70" />
+                            <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 break-all select-all">
+                              {asset.dataHash}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-1 rounded w-fit border border-emerald-200">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Anchored
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                          <a
+                            href={`https://amoy.polygonscan.com/tx/${asset.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded transition"
+                          >
+                            View Tx <ExternalLink className="w-3 h-3" />
+                          </a>
+                        </td>
+                      </tr>
+                    ))
                   )}
-                </TableBody>
-              </Table>
-            </TabsContent>
-          </Tabs>
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function LoginForm() {
-  const { open } = useWeb3Modal();
-
-  const { address } = useAccount();
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <div className="flex justify-center mb-2">
-            <Shield className="h-10 w-10 text-primary" />
-          </div>
-          <CardTitle className="text-center text-2xl">
-            Institution Login
-          </CardTitle>
-          <CardDescription className="text-center">
-            Connect yo god damn wallet
-          </CardDescription>
-        </CardHeader>
-
-        <CardFooter>
-          <Button className="w-full" onClick={() => open()} variant="outline">
-            {address ? (
-              <div className="flex gap-2 items-center">
-                <UserCircle2 className="h-8 w-8 mr-2" />
-                {address.slice(0, 6)}...{address.slice(-4)}
-              </div>
-            ) : (
-              "Connect Wallet"
-            )}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
-}
-
-interface DocumentForm {
-  recipientName: string;
-  recipientEmail: string;
-  recipientId: string;
-  recipientWallet?: string;
-  documentType: string;
-  documentFile: FileList;
-  documentDescription: string;
-  documentId: string;
-}
-
-function NewDocumentForm({
-  onClose,
-  onNewDocumentAdd,
-}: {
-  onClose: () => void;
-  onNewDocumentAdd: (newData: {
-    recipient: {
-      fullName: string;
-      email: string;
-      id: string;
-      walletAddress: string;
-    };
-    document: {
-      type: string;
-      id: string;
-      hash: string;
-      description: string;
-    };
-    issuedAt: bigint;
-    status: boolean;
-  }) => void;
-}) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<DocumentForm>();
-  const { address, connector } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const [loading, setLoading] = useState(false);
-  const newDocumentId = useMemo(() => crypto.randomUUID(), [])
-
-  const onSubmit: SubmitHandler<DocumentForm> = async (data) => {
-    try {
-      if (!walletClient) {
-        return;
-      }
-
-      // console.log(data);
-      setLoading(true);
-
-      const formData = new FormData();
-      formData.append("pdf", data.documentFile[0]);
-      formData.append("wallet_address", data.recipientWallet || "");
-
-      const {
-        data: { hash, embedding },
-      } = await axios.post<{ hash: string; embedding: number[] }>(
-        "https://ledger.palatepals.com/add_legit",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      const {
-        data: { cid },
-      } = await axios.post<{ cid: string }>("/api/register", {
-        recipientName: data.recipientName,
-        recipientEmail: data.recipientEmail,
-        recipientId: data.recipientId,
-        recipientWallet: data.recipientWallet,
-        documentType: data.documentType,
-        documentDescription: data.documentDescription,
-        documentHash: hash,
-        embedding: embedding,
-        documentId: newDocumentId,
-      });
-
-      // console.log(await connector?.getProvider())
-
-      // Convert to EIP-1193 provider
-      const provider = new ethers.BrowserProvider(walletClient.transport);
-      const signer = await provider.getSigner();
-      console.log(signer);
-      // const feeData = await provider.get();
-
-      // console.log(feeData)
-
-      // // Connect to contract
-      const contract = new ethers.Contract(
-        "0xA09916427843c35a233BF355bFAF1C735F9e75fa",
-        abi, // Your contract ABI
-        signer
-      );
-
-      // const estimatedGas = await contract.getAddress;
-
-      // console.log(await contract.issueDocument.staticCallResult("hash", "cid"))
-
-      // Sign and send transaction
-      const gas = await contract.issueDocument.estimateGas(hash, cid);
-      const tx = await contract.issueDocument(hash, cid, {
-        gasLimit: gas + gas / 40n,
-      });
-      await tx.wait();
-
-      // // Handle successful transaction
-      console.log("Transaction successful:", tx.hash);
-
-      onNewDocumentAdd({
-        recipient: {
-          fullName: data.recipientName,
-          email: data.recipientEmail,
-          id: data.recipientId,
-          walletAddress: data.recipientWallet ?? "",
-        },
-        document: {
-          type: data.documentType,
-          id: newDocumentId,
-          hash: hash,
-          description: data.documentDescription,
-        },
-        issuedAt: BigInt(Math.floor(Date.now() / 1000)),
-        status: false,
-      });
-
-      setLoading(false);
-    } catch (error) {
-      console.log(error);
-      setLoading(false);
-
-    }
-
-    // Handle form submission
-  };
-
-
-  return (
-    <form
-      id="new-document-form"
-      className="space-y-6 py-4"
-      onSubmit={handleSubmit(onSubmit)}
-    >
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-medium mb-4">Recipient's Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="recipient-name">Full Name</Label>
-            <Input
-              id="recipient-name"
-              placeholder="Recipient's full name"
-              {...register("recipientName", {
-                required: "Full name is required",
-              })}
-            />
-            {errors.recipientName && (
-              <span className="text-sm text-red-500">
-                {errors.recipientName.message}
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="recipient-email">Email</Label>
-            <Input
-              id="recipient-email"
-              type="email"
-              placeholder="recipient@example.com"
-              {...register("recipientEmail", {
-                required: "Email is required",
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: "Invalid email address",
-                },
-              })}
-            />
-            {errors.recipientEmail && (
-              <span className="text-sm text-red-500">
-                {errors.recipientEmail.message}
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="recipient-id">ID/Registration Number</Label>
-            <Input
-              id="recipient-id"
-              placeholder="Student ID or registration number"
-              {...register("recipientId", { required: "ID is required" })}
-            />
-            {errors.recipientId && (
-              <span className="text-sm text-red-500">
-                {errors.recipientId.message}
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="recipient-wallet">Wallet Address</Label>
-            <Input
-              id="recipient-wallet"
-              placeholder="Blockchain wallet address (optional)"
-              {...register("recipientWallet")}
-            />
-            <p className="text-xs text-muted-foreground">
-              For blockchain verification and storage
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="border-t pt-6">
-        <h3 className="text-lg font-medium mb-4">Document Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="document-type">Type of Document</Label>
-            <Input
-              id="document-type"
-              placeholder="Degree Certificate"
-              {...register("documentType", {
-                required: "Document type is required",
-              })}
-            />
-            {errors.documentType && (
-              <span className="text-sm text-red-500">
-                {errors.documentType.message}
-              </span>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="document-id">Document ID</Label>
-            <Input
-              id="document-id"
-              defaultValue={newDocumentId}
-              value={newDocumentId}
-              readOnly
-            />
-            <p className="text-xs text-muted-foreground">
-              Auto-generated unique identifier
-            </p>
-          </div>
-        </div>
-        <div className="space-y-2 mt-4">
-          <Label htmlFor="document-file">Document File</Label>
-          <Input
-            id="document-file"
-            type="file"
-            accept=".pdf,.doc,.docx"
-            {...register("documentFile", {
-              required: "Document file is required",
-            })}
-          />
-          {errors.documentFile && (
-            <span className="text-sm text-red-500">
-              {errors.documentFile.message}
-            </span>
-          )}
-          <p className="text-sm text-muted-foreground">
-            Upload the document file (PDF, DOC, DOCX)
-          </p>
-        </div>
-        <div className="space-y-2 mt-4">
-          <Label htmlFor="document-description">Description</Label>
-          <Textarea
-            id="document-description"
-            placeholder="Brief description of the document"
-            className="min-h-[80px]"
-            {...register("documentDescription", {
-              required: "Description is required",
-            })}
-          />
-          {errors.documentDescription && (
-            <span className="text-sm text-red-500">
-              {errors.documentDescription.message}
-            </span>
-          )}
-        </div>
-      </div>
-      <DialogFooter className="mt-6">
-        <Button onClick={onClose} variant="outline" type="button">
-          Cancel
-        </Button>
-        <Button type="submit" form="new-document-form">
-          {loading ? (
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Creating...
+                </tbody>
+              </table>
             </div>
-          ) : (
-            "Create Document"
-          )}
-        </Button>
-      </DialogFooter>
-    </form>
+          </div>
+        )}
+      </main>
+    </div>
   );
 }

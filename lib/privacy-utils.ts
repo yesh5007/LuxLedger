@@ -16,15 +16,22 @@ export interface PrivateStudentData {
  * This hash is what gets stored on the Polygon zkEVM blockchain.
  * 
  * @param data The private student data object
- * @returns The Keccak256 hash of the JSON string
+ * @returns The SHA256 hash of the JSON string
  */
 export function hashStudentData(data: PrivateStudentData): string {
     // 1. Sort keys to ensure consistent JSON stringification
-    const sortedData = JSON.stringify(data, Object.keys(data).sort());
+    // We must manually sort and build the object to guarantee deterministic JSON output across all clients
+    const sortedKeys = Object.keys(data).sort();
+    const sortedObj: Record<string, any> = {};
+    for (const key of sortedKeys) {
+        // @ts-ignore
+        sortedObj[key] = data[key];
+    }
+    const sortedData = JSON.stringify(sortedObj);
 
-    // 2. Create a Keccak256 hash of the stringified data
+    // 2. Create a SHA256 hash of the stringified data
     // This ensures that even a single character change in the data will result in a completely different hash.
-    const hash = ethers.keccak256(ethers.toUtf8Bytes(sortedData));
+    const hash = ethers.sha256(ethers.toUtf8Bytes(sortedData));
 
     return hash;
 }

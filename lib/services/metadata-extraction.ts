@@ -7,6 +7,7 @@ export interface ExtractedMetadata {
     documentType?: string;
     documentDescription?: string;
     issuedAt?: number;
+    ocrConfidence?: number;
 }
 
 const genAI = new GoogleGenerativeAI(process.env.NEXT_PUBLIC_GEMINI_API_KEY || "");
@@ -39,7 +40,31 @@ export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
         });
 
         const base64Content = base64Data.split(',')[1];
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+        const jsonSchema = {
+            "type": "object",
+            "properties": {
+                "recipientName": { "type": "string" },
+                "recipientId": { "type": "string" },
+                "documentType": { "type": "string" },
+                "documentDescription": { "type": "string" },
+                "ocrConfidence": {
+                    "type": "number",
+                    "description": "A percentage from 0 to 100 estimating how confident you are in the extraction accuracy."
+                }
+            },
+            "required": ["recipientName", "recipientId", "documentType", "documentDescription", "ocrConfidence"]
+        };
+
+        // Note: The correct property name for the config is generationConfig
+        const model = genAI.getGenerativeModel({
+            model: "gemini-2.5-flash",
+            generationConfig: {
+                responseMimeType: "application/json",
+                // @ts-ignore - The types for responseSchema might be slightly different in older versions, but this structure works
+                responseSchema: jsonSchema
+            }
+        });
 
         const prompt = `
         Perform OCR and Data Extraction on this document.
@@ -48,6 +73,7 @@ export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
         - recipientId: The Serial Number or Unique ID of the item.
         - documentType: The Model Name or Item Type (e.g. "Rolex Submariner", "Birkin Bag").
         - documentDescription: Any extra details or specs listed.
+        - ocrConfidence: A number between 0 and 100 representing your confidence in the OCR accuracy.
 
         Do NOT analyze for fraud. Just extract the text.
 
@@ -76,11 +102,13 @@ export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
             recipientName: data.recipientName,
             recipientId: data.recipientId,
             documentType: data.documentType,
-            documentDescription: data.documentDescription
+            documentDescription: data.documentDescription,
+            ocrConfidence: typeof data.ocrConfidence === 'number' ? data.ocrConfidence : 90
         };
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Extraction AI Error:", error);
-        throw new Error("Failed to extract metadata.");
+        console.dir(error, { depth: null });
+        throw new Error(`Failed to extract metadata: ${error.message}`);
     }
 }

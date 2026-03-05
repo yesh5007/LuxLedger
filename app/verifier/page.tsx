@@ -1,15 +1,17 @@
 "use client"
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Shield, Upload, CheckCircle, AlertTriangle, Link as LinkIcon, Loader2, FileText, ScanEye } from "lucide-react";
+import { Shield, Upload, CheckCircle, AlertTriangle, Link as LinkIcon, Loader2, FileText, ScanEye, Percent } from "lucide-react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from 'wagmi'
 import { useState } from "react";
 import { detectForgery, ForgeryAnalysisResult } from "@/lib/services/ai-forgery";
 import { extractMetadata, ExtractedMetadata } from "@/lib/services/metadata-extraction";
-import { verifyOnChain } from "@/lib/services/blockchain-service";
+import { verifyOnChain, VerificationResult } from "@/lib/services/blockchain-service";
 import { logVerificationAttempt } from "@/lib/services/offchain-log-service";
 import { hashStudentData } from "@/lib/privacy-utils";
+import { FileDropZone } from "@/components/ui/file-drop-zone";
+import { TopNav } from "@/components/ui/top-nav";
 
 export default function VerifierPage() {
     const { open } = useWeb3Modal();
@@ -25,21 +27,22 @@ export default function VerifierPage() {
     // Blockchain Verification State
     const [isVerifyingChain, setIsVerifyingChain] = useState(false);
     const [blockchainStatus, setBlockchainStatus] = useState<"IDLE" | "VALID" | "INVALID" | "ERROR">("IDLE");
+    const [verificationData, setVerificationData] = useState<VerificationResult | null>(null);
 
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0]);
-            setMetadata(null);
-            setForgeryResult(null);
-            setStep("UPLOAD");
-            setBlockchainStatus("IDLE");
-        }
+    const handleFileSelected = async (selectedFile: File) => {
+        setFile(selectedFile);
+        setMetadata(null);
+        setForgeryResult(null);
+        setStep("UPLOAD");
+        setBlockchainStatus("IDLE");
+        setVerificationData(null);
     };
 
     const runAnalysisPipeline = async () => {
         if (!file) return;
         setIsProcessing(true);
         setBlockchainStatus("IDLE");
+        setVerificationData(null);
 
         try {
             // STEP 1: Metadata Extraction (OCR)
@@ -74,22 +77,22 @@ export default function VerifierPage() {
         setIsVerifyingChain(true);
         try {
             // Reconstruct Data for Hashing
-            // These fields MUST match exactly what the Issuer used when registering.
-            const studentData = {
-                recipientName: metadata.recipientName || "",
-                recipientEmail: "",
-                recipientId: metadata.recipientId || "",
-                documentType: metadata.documentType || "",
-                documentDescription: metadata.documentDescription || "",
-                issuedAt: 0,
+            // These fields MUST match exactly what the Issuer used when registering (normalized, deterministic).
+            const dataToHash = {
+                ownerName: (metadata.recipientName || "").trim().toLowerCase(),
+                serialNumber: (metadata.recipientId || "").trim().toLowerCase(),
+                modelName: (metadata.documentType || "").trim().toLowerCase()
             };
 
-            const hash = hashStudentData(studentData as any);
+            // @ts-ignore
+            const hash = hashStudentData(dataToHash);
             console.log("Verifying Hash:", hash);
 
             // Verify: search attestation records for this document hash
-            const isValid = await verifyOnChain(hash);
+            const result = await verifyOnChain(hash);
+            const isValid = result.isValid;
             setBlockchainStatus(isValid ? "VALID" : "INVALID");
+            setVerificationData(isValid ? result : null);
 
             // Log attempt off-chain (No PII)
             logVerificationAttempt(isValid ? "VALID" : "INVALID");
@@ -104,18 +107,7 @@ export default function VerifierPage() {
 
     return (
         <div className="flex flex-col min-h-screen">
-            <header className="border-b bg-white">
-                <div className="container flex h-16 items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2">
-                        <Shield className="h-6 w-6 text-amber-600" />
-                        <span className="text-xl font-bold font-serif">LuxLedger</span>
-                        <span className="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">VERIFIER</span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        {!address && <Button onClick={() => open()} variant="ghost">Connect Wallet (Optional)</Button>}
-                    </div>
-                </div>
-            </header>
+            <TopNav />
 
             <main className="flex-1 container py-12 max-w-4xl mx-auto">
                 <div className="text-center mb-10">
@@ -139,24 +131,10 @@ export default function VerifierPage() {
                                 </div>
                             ) : (
                                 <>
-                                    <div className="h-24 w-24 bg-blue-50 rounded-full flex items-center justify-center">
-                                        <Upload className="h-10 w-10 text-blue-600" />
-                                    </div>
-                                    <div className="text-center space-y-4 w-full max-w-md">
-                                        <label className="block w-full cursor-pointer">
-                                            <span className="sr-only">Choose file</span>
-                                            <div className="border-2 border-dashed border-slate-300 rounded-lg p-8 hover:bg-slate-50 transition">
-                                                <p className="text-sm font-medium text-slate-600">Upload Certificate Image</p>
-                                                <p className="text-xs text-slate-400 mt-2">Analyzes Pixels & Data separately</p>
-                                            </div>
-                                            <input type="file" onChange={handleFileChange} className="hidden" />
-                                        </label>
-                                        {file && (
-                                            <div className="text-sm font-medium text-blue-700 bg-blue-50 p-2 rounded">
-                                                Selected: {file.name}
-                                            </div>
-                                        )}
-                                    </div>
+                                    <FileDropZone
+                                        onFileSelected={handleFileSelected}
+                                        className="max-w-md w-full my-6 bg-white"
+                                    />
                                     <Button size="lg" onClick={runAnalysisPipeline} disabled={!file} className="w-full max-w-sm">
                                         Start Verification Pipeline
                                     </Button>
@@ -206,17 +184,31 @@ export default function VerifierPage() {
                                         <h3 className="font-semibold text-muted-foreground uppercase tracking-wider text-xs">Metadata Service (OCR)</h3>
                                     </div>
                                     <div className="space-y-4 bg-slate-50 p-6 rounded-lg border">
+
+                                        {/* OCR Confidence Badge */}
+                                        {metadata?.ocrConfidence && (
+                                            <div className="flex items-center justify-between mb-4 pb-4 border-b">
+                                                <span className="text-xs font-semibold text-slate-500 uppercase">Extraction Confidence</span>
+                                                <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center ${metadata.ocrConfidence >= 85 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                    <Percent className="w-3 h-3 mr-1" />
+                                                    {metadata.ocrConfidence}%
+                                                </span>
+                                            </div>
+                                        )}
+
                                         <div>
                                             <label className="text-xs text-slate-500">Asset Owner</label>
                                             <p className="font-medium text-lg">{metadata?.recipientName || "N/A"}</p>
                                         </div>
-                                        <div>
-                                            <label className="text-xs text-slate-500">Model / Type</label>
-                                            <p className="font-medium">{metadata?.documentType || "N/A"}</p>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-slate-500">Serial Number</label>
-                                            <p className="font-medium text-mono">{metadata?.recipientId || "N/A"}</p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs text-slate-500">Model / Type</label>
+                                                <p className="font-medium">{metadata?.documentType || "N/A"}</p>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-500">Serial Number</label>
+                                                <p className="font-medium font-mono">{metadata?.recipientId || "N/A"}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -255,9 +247,23 @@ export default function VerifierPage() {
                                     </div>
 
                                     {blockchainStatus === "VALID" && (
-                                        <div className="mt-4 p-4 bg-green-50 text-green-800 rounded border border-green-200 text-center">
-                                            <strong>✅ Immutable Proof Found</strong><br />
-                                            The document extraction matches the cryptographic hash stored on Polygon.
+                                        <div className="mt-4 p-5 bg-green-50 text-green-900 rounded-lg border border-green-200">
+                                            <div className="text-center border-b border-green-200 pb-3 mb-3">
+                                                <strong className="text-lg">✅ Immutable Proof Found</strong><br />
+                                                <span className="text-sm">The document extraction matches the cryptographic hash stored on Polygon.</span>
+                                            </div>
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex flex-col">
+                                                    <span className="text-green-700 text-xs font-bold uppercase">Anchored By (Issuer Wallet)</span>
+                                                    <span className="font-mono break-all bg-white p-1 rounded mt-1 border border-green-100">{verificationData?.issuer}</span>
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="text-green-700 text-xs font-bold uppercase">Timestamp</span>
+                                                    <span className="bg-white p-1 rounded mt-1 border border-green-100">
+                                                        {verificationData?.timestamp ? new Date(verificationData.timestamp * 1000).toLocaleString() : "Unknown"}
+                                                    </span>
+                                                </div>
+                                            </div>
                                         </div>
                                     )}
 

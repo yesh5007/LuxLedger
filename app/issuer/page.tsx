@@ -1,225 +1,244 @@
-"use client"
+"use client";
+
+import React, { useState } from "react";
+// Add Link import at the top if missing, though it's likely not. We will add it to the import list.
 import Link from "next/link";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Shield, PenTool, Download, History, PlusSquare, Loader2, CheckCircle, AlertCircle } from "lucide-react";
-import { useWeb3Modal } from "@web3modal/wagmi/react";
-import { useAccount } from 'wagmi'
-import { hashStudentData, PrivateStudentData } from "@/lib/privacy-utils";
+import { Loader2, ShieldCheck, PenTool, CheckCircle2, X } from "lucide-react";
+import { hashStudentData } from "@/lib/privacy-utils";
 import { attestOnChain } from "@/lib/services/blockchain-service";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { injected } from "wagmi/connectors";
+import { TopNav } from "@/components/ui/top-nav";
+import { FileDropZone } from "@/components/ui/file-drop-zone";
+import { extractMetadata, ExtractedMetadata } from "@/lib/services/metadata-extraction";
 
 export default function IssuerPage() {
-    const { open } = useWeb3Modal();
-    const { address } = useAccount();
+    const { address, isConnected } = useAccount();
+    const { connect, connectors } = useConnect();
+    const { disconnect } = useDisconnect();
 
-    return (
-        <div className="flex flex-col min-h-screen">
-            <header className="border-b bg-white">
-                <div className="container flex h-16 items-center justify-between">
-                    <Link href="/" className="flex items-center gap-2">
-                        <Shield className="h-6 w-6 text-amber-600" />
-                        <span className="text-xl font-bold font-serif">LuxLedger</span>
-                        <span className="text-xs font-mono bg-amber-50 text-amber-800 px-2 py-1 rounded ml-2">BRAND MODE</span>
-                    </Link>
-                    <div className="flex items-center gap-4">
-                        <Button onClick={() => open()} variant="outline" className="border-amber-200 hover:bg-amber-50">
-                            {address ? address.slice(0, 6) + "..." + address.slice(-4) : "Connect Brand Wallet"}
-                        </Button>
-                    </div>
-                </div>
-            </header>
+    const [isProcessingFile, setIsProcessingFile] = useState(false);
+    const [fileProcessed, setFileProcessed] = useState(false);
 
-            <main className="flex-1 container py-12 max-w-5xl">
-                <div className="grid md:grid-cols-3 gap-8">
-                    {/* Sidebar / Menu */}
-                    <div className="space-y-4">
-                        <div className="p-4 bg-slate-50 rounded-lg border">
-                            <h3 className="font-semibold mb-4 text-slate-700">Actions</h3>
-                            <div className="space-y-2">
-                                <Button variant="secondary" className="w-full justify-start hover:bg-amber-50">
-                                    <PlusSquare className="h-4 w-4 mr-2" /> Issue New Authenticity Cert
-                                </Button>
-                                <Button variant="ghost" className="w-full justify-start text-muted-foreground">
-                                    <History className="h-4 w-4 mr-2" /> History (Coming Soon)
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-100">
-                            <h3 className="font-semibold mb-2 text-purple-900">Demo Tools</h3>
-                            <p className="text-xs text-purple-700 mb-4">
-                                We don't have a real backend yet, so use these samples to test the verification flow.
-                            </p>
-                            <div className="space-y-2">
-                                <a href="/sample-degree.html" target="_blank" className="block">
-                                    <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700">
-                                        <Download className="h-4 w-4 mr-2" /> Get Valid Sample
-                                    </Button>
-                                </a>
-                                <div className="text-center text-xs text-muted-foreground pt-1">
-                                    Save as PDF or Screenshot
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Main Content */}
-                    <div className="md:col-span-2 space-y-8">
-                        <div>
-                            <h1 className="text-2xl font-bold mb-2 font-serif">Issue Authenticity Certificate</h1>
-                            <p className="text-muted-foreground">
-                                Create a tamper-proof digital twin for your physical asset.
-                            </p>
-                        </div>
-
-                        {!address ? (
-                            <div className="h-64 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center p-8 space-y-4">
-                                <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center">
-                                    <Shield className="h-8 w-8 text-slate-400" />
-                                </div>
-                                <div>
-                                    <h3 className="font-semibold text-lg">Connect Wallet to Start</h3>
-                                    <p className="text-muted-foreground max-w-sm mx-auto">
-                                        You need to sign transactions to attest documents on-chain.
-                                    </p>
-                                </div>
-                                <Button onClick={() => open()}>Connect Wallet</Button>
-                            </div>
-                        ) : (
-                            <div className="border rounded-lg p-8 space-y-6">
-                                <div className="flex items-center gap-4 border-b pb-4">
-                                    <div className="h-12 w-12 bg-amber-50 rounded-full flex items-center justify-center">
-                                        <PenTool className="h-6 w-6 text-amber-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold">New Asset Registration</h3>
-                                        <p className="text-sm text-muted-foreground">Register a new item on the LuxLedger registry.</p>
-                                    </div>
-                                </div>
-
-                                <IssuerForm />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </main>
-        </div>
-    );
-}
-
-function IssuerForm() {
-    const [isLoading, setIsLoading] = useState(false);
-    const [txHash, setTxHash] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
+    // Extracted / Manual form data
     const [formData, setFormData] = useState({
-        recipientName: "",
-        recipientId: "",
-        recipientEmail: "",
-        documentType: "",
-        documentDescription: "",
+        ownerName: "",
+        serialNumber: "",
+        modelName: "",
+        details: ""
     });
 
-    const handleIssue = async () => {
-        setIsLoading(true);
-        setError(null);
-        setTxHash(null);
+    const [isAttesting, setIsAttesting] = useState(false);
+    const [attestResult, setAttestResult] = useState<{ success: boolean, txHash?: string, error?: string } | null>(null);
+
+    const handleFileSelected = async (file: File) => {
+        setIsProcessingFile(true);
+        setFileProcessed(false);
+        setAttestResult(null);
 
         try {
-            // 1. Prepare Data
-            // issuedAt is fixed at 0 so the verifier can reconstruct the same hash
-            // from OCR-extracted fields without knowing the exact issuance timestamp.
-            const studentData: PrivateStudentData = {
-                ...formData,
-                issuedAt: 0,
+            console.log("Extracting metadata with Gemini...");
+            const metadata = await extractMetadata(file);
+            console.log("Metadata extracted:", metadata);
+
+            setFormData({
+                ownerName: metadata.recipientName || "",
+                serialNumber: metadata.recipientId || "",
+                modelName: metadata.documentType || "",
+                details: metadata.documentDescription || ""
+            });
+            setFileProcessed(true);
+        } catch (error: any) {
+            console.error("OCR failed:", error);
+            alert(`Failed to extract details: ${error.message}\n\nYou can enter them manually.`);
+            // Unlock the form so the user can enter details manually
+            setFileProcessed(true);
+        } finally {
+            setIsProcessingFile(false);
+        }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleIssue = async () => {
+        if (!isConnected) {
+            alert("Please connect your wallet first! We need it to sign the transaction.");
+            return;
+        }
+
+        if (!formData.ownerName || !formData.serialNumber || !formData.modelName) {
+            alert("Please ensure Owner Name, Serial Number, and Model Name are filled out.");
+            return;
+        }
+
+        setIsAttesting(true);
+        setAttestResult(null);
+
+        try {
+            // STEP 1: Hash the metadata locally (privacy-preserving)
+            // CRITICAL: We only hash deterministic, normalized data so it can be perfectly re-created during verification.
+            // Using a timestamp here would make it impossible for a Verifier to guess the exact millisecond to reproduce the hash.
+            const dataToHash = {
+                ownerName: formData.ownerName.trim().toLowerCase(),
+                serialNumber: formData.serialNumber.trim().toLowerCase(),
+                modelName: formData.modelName.trim().toLowerCase()
             };
 
-            // 2. Hash Data (Privacy Layer)
-            const hash = hashStudentData(studentData);
-            console.log("Generated Hash:", hash);
+            // @ts-ignore - bypassing the strict PrivateStudentData interface for the real Asset schema
+            const documentHash = hashStudentData(dataToHash);
+            console.log("Generated private hash:", documentHash);
 
-            // 3. Attest on Blockchain (Truth Layer)
-            const result = await attestOnChain(hash);
+            // STEP 2: Send hash to smart contract on Polygon Amoy
+            // Using a dummy metadata URI for this demo
+            const metadataURI = `ipfs://luxledger-demo-${Date.now()}`;
+            console.log("Sending transaction to blockchain...");
 
-            if (result.success && result.txHash) {
-                setTxHash(result.txHash);
-            } else {
-                setError(result.error || "Unknown error during attestation");
-            }
-
-        } catch (err: any) {
-            setError(err.message || "Failed to process");
+            const result = await attestOnChain(documentHash, metadataURI);
+            setAttestResult(result);
+        } catch (error: any) {
+            console.error(error);
+            setAttestResult({ success: false, error: error.message || "Failed to mint attestation." });
         } finally {
-            setIsLoading(false);
+            setIsAttesting(false);
         }
     };
 
     return (
-        <div className="space-y-4 text-left">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label>Owner Name</Label>
-                    <Input
-                        value={formData.recipientName}
-                        onChange={(e) => setFormData({ ...formData, recipientName: e.target.value })}
-                    />
+        <div className="min-h-screen bg-slate-50 relative pb-20">
+            <TopNav />
+
+            <main className="max-w-4xl mx-auto px-4 py-8 relative">
+
+                {/* Intro */}
+                <div className="mb-8">
+                    <h1 className="text-2xl font-bold font-serif text-slate-900 mb-2">Issue Authenticity Certificate</h1>
+                    <p className="text-slate-500">Upload an asset document. The AI will extract its details, and we will anchor an immutable hash of those details to Polygon Amoy.</p>
                 </div>
-                <div className="space-y-2">
-                    <Label>Serial Number</Label>
-                    <Input
-                        value={formData.recipientId}
-                        onChange={(e) => setFormData({ ...formData, recipientId: e.target.value })}
-                    />
-                </div>
-            </div>
 
-            <div className="space-y-2">
-                <Label>Model / Item Name</Label>
-                <Input
-                    value={formData.documentType}
-                    onChange={(e) => setFormData({ ...formData, documentType: e.target.value })}
-                />
-            </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Left Column: Form */}
+                    <div className="md:col-span-2 space-y-6">
 
-            <div className="space-y-2">
-                <Label>Details / Specs</Label>
-                <Input
-                    value={formData.documentDescription}
-                    onChange={(e) => setFormData({ ...formData, documentDescription: e.target.value })}
-                />
-            </div>
+                        {/* Step 1: Upload */}
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <div className="flex items-center mb-4">
+                                <div className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center mr-3">1</div>
+                                <h2 className="text-lg font-semibold text-slate-800">Scan Asset Document</h2>
+                            </div>
 
-            {error && (
-                <div className="p-3 bg-red-50 text-red-700 text-sm rounded flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4" /> {error}
-                </div>
-            )}
+                            <FileDropZone
+                                onFileSelected={handleFileSelected}
+                                accept="image/*,application/pdf"
+                                maxSizeMB={10}
+                            />
 
-            {txHash && (
-                <div className="p-3 bg-green-50 text-green-700 text-sm rounded border border-green-200">
-                    <div className="flex items-center gap-2 font-semibold mb-1">
-                        <CheckCircle className="h-4 w-4" /> Success! Attestation Minted.
+                            {isProcessingFile && (
+                                <div className="mt-4 flex items-center justify-center text-sm text-slate-500 bg-slate-50 py-3 rounded-lg border border-slate-100">
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2 text-amber-500" />
+                                    AI is reading document via Gemini Flash 2.0...
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Step 2: Review Data */}
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <div className="flex items-center mb-6">
+                                <div className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center mr-3">2</div>
+                                <h2 className="text-lg font-semibold text-slate-800">Review & Verify Details</h2>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="ownerName">Owner / Dealer Name</Label>
+                                        <Input id="ownerName" name="ownerName" value={formData.ownerName} onChange={handleInputChange} placeholder="e.g. Vintage Watches Ltd" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="serialNumber">Serial Number</Label>
+                                        <Input id="serialNumber" name="serialNumber" value={formData.serialNumber} onChange={handleInputChange} placeholder="e.g. SN-89102-X" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="modelName">Model / Item Name</Label>
+                                    <Input id="modelName" name="modelName" value={formData.modelName} onChange={handleInputChange} placeholder="e.g. Rolex Submariner Date" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="details">Details / Specifications</Label>
+                                    <Input id="details" name="details" value={formData.details} onChange={handleInputChange} placeholder="e.g. Oystersteel, Black Dial, 2024" />
+                                </div>
+                            </div>
+
+                            {/* Attest Result Alert */}
+                            {attestResult && (
+                                <div className={`mt-6 p-4 rounded-lg border text-sm ${attestResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
+                                    <div className="flex items-center mb-1">
+                                        {attestResult.success ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <X className="w-4 h-4 mr-2" />}
+                                        <span className="font-semibold">{attestResult.success ? 'Success! Asset Registered On-Chain.' : 'Registration Failed'}</span>
+                                    </div>
+                                    {attestResult.success ? (
+                                        <div className="mt-2 text-xs opacity-90 font-mono break-all pl-6">
+                                            TX: <a href={`https://amoy.polygonscan.com/tx/${attestResult.txHash}`} target="_blank" rel="noreferrer" className="underline hover:text-green-600">{attestResult.txHash}</a>
+                                        </div>
+                                    ) : (
+                                        <div className="mt-1 pl-6 opacity-80">{attestResult.error}</div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Submit Button */}
+                            <Button
+                                onClick={handleIssue}
+                                disabled={isAttesting || !isConnected || !formData.serialNumber}
+                                className="w-full mt-6 bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-medium"
+                                size="lg"
+                            >
+                                {isAttesting ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Mining Transaction...
+                                    </>
+                                ) : (
+                                    <>
+                                        <PenTool className="mr-2 h-4 w-4" /> Issue Certificate (Polygon Amoy)
+                                    </>
+                                )}
+                            </Button>
+
+                            {!isConnected && (
+                                <p className="text-center text-xs text-amber-600 mt-2 font-medium">
+                                    ↑ Connect your wallet above to issue.
+                                </p>
+                            )}
+                        </div>
                     </div>
-                    <p className="font-mono text-xs break-all text-green-800 opacity-80">TX: {txHash}</p>
-                    <p className="mt-2 text-xs text-black">
-                        In a real app, we would now generate the PDF containing these details hidden in metadata.
-                    </p>
-                </div>
-            )}
 
-            <Button onClick={handleIssue} disabled={isLoading} className="w-full bg-amber-600 hover:bg-amber-700 text-white">
-                {isLoading ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Minting Asset Twin...
-                    </>
-                ) : (
-                    <>
-                        <PenTool className="mr-2 h-4 w-4" /> Issue Certificate (On-Chain)
-                    </>
-                )}
-            </Button>
-        </div>
+                    {/* Right Column: Helper / Sidebar */}
+                    <div className="space-y-4">
+                        <div className="p-5 bg-white rounded-xl shadow-sm border border-slate-200">
+                            <h3 className="font-semibold text-slate-800 mb-3">How it works</h3>
+                            <ul className="text-sm text-slate-600 space-y-3">
+                                <li className="flex gap-2">
+                                    <div className="text-amber-500 font-bold">1</div>
+                                    <div><strong className="text-slate-800 block">AI Extraction</strong> Upload an invoice or certificate. Gemini reads the details instantly.</div>
+                                </li>
+                                <li className="flex gap-2">
+                                    <div className="text-amber-500 font-bold">2</div>
+                                    <div><strong className="text-slate-800 block">Privacy Hashing</strong> Your data never touches the blockchain raw. It's hashed (SHA256) locally first.</div>
+                                </li>
+                                <li className="flex gap-2">
+                                    <div className="text-amber-500 font-bold">3</div>
+                                    <div><strong className="text-slate-800 block">On-Chain Anchoring</strong> A smart contract on Polygon Amoy stores the hash forever, proving ownership.</div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </main >
+        </div >
     );
 }

@@ -1,11 +1,11 @@
-export const AttestationRegistryABI = [
+export const LuxLedgerRegistryABI = [
     {
         "anonymous": false,
         "inputs": [
             {
                 "indexed": true,
                 "internalType": "bytes32",
-                "name": "hash",
+                "name": "dataHash",
                 "type": "bytes32"
             },
             {
@@ -13,39 +13,178 @@ export const AttestationRegistryABI = [
                 "internalType": "address",
                 "name": "issuer",
                 "type": "address"
+            },
+            {
+                "indexed": false,
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            },
+            {
+                "indexed": false,
+                "internalType": "string",
+                "name": "metadataURI",
+                "type": "string"
             }
         ],
-        "name": "AttestationRevoked",
+        "name": "AssetRegistered",
         "type": "event"
     },
     {
-        "anonymous": false,
+        "inputs": [],
+        "name": "assetCount",
+        "outputs": [
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
         "inputs": [
             {
-                "indexed": true,
                 "internalType": "bytes32",
-                "name": "hash",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "name": "assets",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "dataHash",
                 "type": "bytes32"
             },
             {
-                "indexed": true,
+                "internalType": "address",
+                "name": "issuer",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "metadataURI",
+                "type": "string"
+            },
+            {
+                "internalType": "bool",
+                "name": "exists",
+                "type": "bool"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "bytes32",
+                "name": "dataHash",
+                "type": "bytes32"
+            }
+        ],
+        "name": "getAsset",
+        "outputs": [
+            {
+                "components": [
+                    {
+                        "internalType": "bytes32",
+                        "name": "dataHash",
+                        "type": "bytes32"
+                    },
+                    {
+                        "internalType": "address",
+                        "name": "issuer",
+                        "type": "address"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "timestamp",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "string",
+                        "name": "metadataURI",
+                        "type": "string"
+                    },
+                    {
+                        "internalType": "bool",
+                        "name": "exists",
+                        "type": "bool"
+                    }
+                ],
+                "internalType": "struct LuxLedgerRegistry.Asset",
+                "name": "",
+                "type": "tuple"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
                 "internalType": "address",
                 "name": "issuer",
                 "type": "address"
             }
         ],
-        "name": "AttestationStored",
-        "type": "event"
+        "name": "getAssetsByIssuer",
+        "outputs": [
+            {
+                "internalType": "bytes32[]",
+                "name": "",
+                "type": "bytes32[]"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+    },
+    {
+        "inputs": [
+            {
+                "internalType": "address",
+                "name": "",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "",
+                "type": "uint256"
+            }
+        ],
+        "name": "issuerHashes",
+        "outputs": [
+            {
+                "internalType": "bytes32",
+                "name": "",
+                "type": "bytes32"
+            }
+        ],
+        "stateMutability": "view",
+        "type": "function"
     },
     {
         "inputs": [
             {
                 "internalType": "bytes32",
-                "name": "hash",
+                "name": "dataHash",
                 "type": "bytes32"
+            },
+            {
+                "internalType": "string",
+                "name": "metadataURI",
+                "type": "string"
             }
         ],
-        "name": "attest",
+        "name": "registerAsset",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function"
@@ -54,29 +193,31 @@ export const AttestationRegistryABI = [
         "inputs": [
             {
                 "internalType": "bytes32",
-                "name": "hash",
+                "name": "dataHash",
                 "type": "bytes32"
             }
         ],
-        "name": "revoke",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-    },
-    {
-        "inputs": [
-            {
-                "internalType": "bytes32",
-                "name": "hash",
-                "type": "bytes32"
-            }
-        ],
-        "name": "verify",
+        "name": "verifyAsset",
         "outputs": [
             {
                 "internalType": "bool",
-                "name": "",
+                "name": "exists",
                 "type": "bool"
+            },
+            {
+                "internalType": "address",
+                "name": "issuer",
+                "type": "address"
+            },
+            {
+                "internalType": "uint256",
+                "name": "timestamp",
+                "type": "uint256"
+            },
+            {
+                "internalType": "string",
+                "name": "metadataURI",
+                "type": "string"
             }
         ],
         "stateMutability": "view",
