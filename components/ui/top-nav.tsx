@@ -2,64 +2,79 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Shield } from "lucide-react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from 'wagmi';
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function TopNav() {
     const { open } = useWeb3Modal();
     const { address, isConnected } = useAccount();
     const pathname = usePathname();
 
-    const NavLink = ({ href, label }: { href: string; label: string }) => {
-        const isActive = pathname === href || (href !== "/" && pathname?.startsWith(href));
-        return (
-            <Link href={href}>
-                <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    className={isActive
-                        ? "bg-purple-100/50 text-purple-700 font-bold tracking-wider border border-purple-200"
-                        : "text-slate-500 font-bold tracking-wider hover:text-purple-600"}
-                >
-                    {label}
-                </Button>
-            </Link>
-        );
-    };
+    const links = [
+        { href: "/", label: "Home" },
+        { href: "/issuer", label: "Issue" },
+        { href: "/verifier", label: "Verify" },
+        { href: "/explorer", label: "Explorer" },
+        { href: "/dashboard", label: "Dashboard" },
+    ];
 
     return (
-        <header className="border-b bg-white top-0 sticky z-50">
-            <div className="container flex h-16 items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Link href="/" className="flex items-center gap-2">
-                        <Shield className="h-6 w-6 text-purple-600" />
-                        <span className="text-xl font-bold font-serif tracking-tight">LuxLedger</span>
-                    </Link>
-                </div>
+        <header className="sticky top-0 z-50 border-b border-border/60" style={{ background: 'var(--surface-0)', backdropFilter: 'blur(8px)' }}>
+            <div className="container flex h-14 items-center justify-between">
+                {/* Wordmark — no icon, just typography */}
+                <Link href="/" className="flex items-center gap-0">
+                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '1.2rem', letterSpacing: '-0.03em' }}>
+                        Lux<span style={{ fontWeight: 700 }}>Ledger</span>
+                    </span>
+                </Link>
 
-                {/* Centered Navigation Buttons */}
-                <nav className="hidden md:flex items-center gap-1 bg-white p-1 rounded-lg">
-                    <NavLink href="/" label="HOME" />
-                    <NavLink href="/issuer" label="ISSUE" />
-                    <NavLink href="/verifier" label="VERIFY" />
-                    <NavLink href="/explorer" label="EXPLORER" />
-                    <NavLink href="/dashboard" label="DASHBOARD" />
+                {/* Navigation — left-aligned, understated */}
+                <nav className="hidden md:flex items-center gap-1">
+                    {links.map(({ href, label }) => {
+                        const isActive = pathname === href || (href !== "/" && pathname?.startsWith(href));
+                        return (
+                            <Link key={href} href={href}>
+                                <button
+                                    className={`
+                                        px-3 py-1.5 text-[13px] font-medium rounded-md transition-colors duration-150
+                                        ${isActive
+                                            ? 'bg-foreground/[0.06] text-foreground'
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04]'}
+                                    `}
+                                >
+                                    {label}
+                                </button>
+                            </Link>
+                        );
+                    })}
                 </nav>
 
-                <div className="flex items-center gap-4">
+                {/* Right side — wallet + theme */}
+                <div className="flex items-center gap-3">
+                    <ThemeToggle />
                     {!isConnected ? (
-                        <Button onClick={() => open()} variant="default" className="bg-purple-600 hover:bg-purple-700 text-white font-medium shadow-sm">
+                        <button
+                            onClick={() => open()}
+                            className="h-8 px-4 text-[13px] font-semibold rounded-md text-primary-foreground transition-colors duration-150"
+                            style={{ background: 'var(--accent-base)' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-base)')}
+                        >
                             Connect Wallet
-                        </Button>
+                        </button>
                     ) : (
-                        <div className="flex items-center gap-3">
-                            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-full border border-green-200 text-xs font-medium">
-                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                                Amoy Node Connected
+                        <div className="flex items-center gap-2">
+                            <div className="hidden sm:flex items-center gap-1.5 h-7 px-2.5 rounded-md text-[11px] font-medium border border-border text-muted-foreground" style={{ background: 'var(--surface-2)' }}>
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                Amoy
                             </div>
-                            <Button variant="outline" size="sm" onClick={() => open()} className="font-mono text-xs border-slate-200 shadow-sm text-slate-700">
-                                {address?.slice(0, 6)}...{address?.slice(-4)}
-                            </Button>
+                            <button
+                                onClick={() => open()}
+                                className="h-7 px-2.5 rounded-md text-[11px] font-mono font-medium border border-border text-foreground transition-colors duration-150 hover:bg-foreground/[0.04]"
+                            >
+                                {address?.slice(0, 6)}…{address?.slice(-4)}
+                            </button>
                         </div>
                     )}
                 </div>

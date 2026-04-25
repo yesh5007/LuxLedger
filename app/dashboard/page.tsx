@@ -1,7 +1,6 @@
 "use client"
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Loader2, ExternalLink, Clock, Fingerprint, CheckCircle2, Shield } from "lucide-react";
+import { LayoutDashboard, Loader2, ExternalLink, Clock, Fingerprint, CheckCircle2 } from "lucide-react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from 'wagmi';
 import { useState, useEffect } from "react";
@@ -9,140 +8,165 @@ import { getRegisteredAssetsByIssuer, RegisteredAssetEvent } from "@/lib/service
 import { TopNav } from "@/components/ui/top-nav";
 
 export default function DashboardPage() {
-  const { open } = useWeb3Modal();
-  const { address, isConnected } = useAccount();
-  const [assets, setAssets] = useState<RegisteredAssetEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+    const { open } = useWeb3Modal();
+    const { address, isConnected } = useAccount();
+    const [assets, setAssets] = useState<RegisteredAssetEvent[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (isConnected && address) {
-      fetchMyAssets(address);
-    } else {
-      setIsLoading(false);
-    }
-  }, [isConnected, address]);
+    useEffect(() => {
+        if (isConnected && address) {
+            fetchMyAssets(address);
+        } else {
+            setIsLoading(false);
+        }
+    }, [isConnected, address]);
 
-  const fetchMyAssets = async (userAddress: string) => {
-    setIsLoading(true);
-    const result = await getRegisteredAssetsByIssuer(userAddress);
-    if (result.success && result.assets) {
-      setAssets(result.assets);
-    } else {
-      console.error("Failed to fetch dashboard assets:", result.error);
-    }
-    setIsLoading(false);
-  };
+    const fetchMyAssets = async (userAddress: string) => {
+        setIsLoading(true);
+        const result = await getRegisteredAssetsByIssuer(userAddress);
+        if (result.success && result.assets) {
+            setAssets(result.assets);
+        } else {
+            console.error("Failed to fetch dashboard assets:", result.error);
+        }
+        setIsLoading(false);
+    };
 
-  return (
-    <div className="flex flex-col min-h-screen bg-slate-50">
-      <TopNav />
+    return (
+        <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface-0)' }}>
+            <TopNav />
 
-      <main className="flex-1 container py-10 max-w-5xl mx-auto">
-        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2 font-serif flex items-center gap-2">
-              <LayoutDashboard className="h-7 w-7 text-amber-600" />
-              Issuer Dashboard
-            </h1>
-            <p className="text-muted-foreground">
-              Manage and review your personally issued, cryptographically secured assets.
-            </p>
-          </div>
-          {isConnected && (
-            <Button onClick={() => address && fetchMyAssets(address)} variant="outline" disabled={isLoading} className="shadow-sm">
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LayoutDashboard className="w-4 h-4 mr-2" />}
-              Sync Ledger
-            </Button>
-          )}
-        </div>
+            <main className="flex-1 container max-w-5xl py-12">
+                {/* Page header */}
+                <div className="flex items-end justify-between mb-10 stagger-in" style={{ "--stagger": 0 } as React.CSSProperties}>
+                    <div>
+                        <p className="text-[13px] font-medium text-muted-foreground tracking-wide uppercase mb-2">Your Wallet</p>
+                        <h1 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-semibold tracking-[-0.03em] text-foreground">
+                            Issuer Dashboard
+                        </h1>
+                    </div>
+                    {isConnected && (
+                        <button
+                            onClick={() => address && fetchMyAssets(address)}
+                            disabled={isLoading}
+                            className="h-9 px-4 text-[13px] font-medium rounded-md border border-border text-foreground hover:bg-foreground/[0.04] transition-colors duration-150 disabled:opacity-50 flex items-center gap-2"
+                        >
+                            {isLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LayoutDashboard className="w-3.5 h-3.5" />}
+                            Sync
+                        </button>
+                    )}
+                </div>
 
-        {!isConnected ? (
-          <div className="bg-white rounded-xl shadow-sm border p-12 text-center flex flex-col items-center">
-            <Shield className="h-16 w-16 text-slate-300 mb-4" />
-            <h2 className="text-xl font-bold mb-2">Wallet Disconnected</h2>
-            <p className="text-slate-500 mb-6 max-w-sm">Please connect your authorized issuer wallet to access your private dashboard and transaction history.</p>
-            <Button onClick={() => open()} className="bg-amber-600 hover:bg-amber-700">Connect to Dashboard</Button>
-          </div>
-        ) : (
-          <div className="bg-white shadow-sm rounded-xl border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-slate-50 text-slate-600 border-b text-xs uppercase tracking-wider font-semibold">
-                  <tr>
-                    <th className="px-6 py-4">Issuance Date</th>
-                    <th className="px-6 py-4">Document Fingerprint (SHA-256)</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Polygon Amoy Scan</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                        <Loader2 className="w-8 h-8 mx-auto animate-spin mb-2 text-amber-600" />
-                        <p>Syncing personal transactions from the blockchain...</p>
-                      </td>
-                    </tr>
-                  ) : assets.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                        You have not issued any documents using this wallet address yet.
-                        <div className="mt-4">
-                          <Link href="/issuer">
-                            <Button variant="default" className="bg-amber-600 hover:bg-amber-700">
-                              Issue Your First Asset
-                            </Button>
-                          </Link>
+                {!isConnected ? (
+                    <div className="py-20 text-center stagger-in" style={{ "--stagger": 1 } as React.CSSProperties}>
+                        <p className="text-muted-foreground mb-4">Connect your issuer wallet to view your transaction history.</p>
+                        <button
+                            onClick={() => open()}
+                            className="h-10 px-5 text-[13px] font-semibold rounded-md text-primary-foreground transition-colors duration-150"
+                            style={{ background: 'var(--accent-base)' }}
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-base)')}
+                        >
+                            Connect Wallet
+                        </button>
+                    </div>
+                ) : (
+                    <div className="stagger-in" style={{ "--stagger": 1 } as React.CSSProperties}>
+                        {/* Stats strip */}
+                        <div className="flex gap-8 mb-8 pb-8 border-b border-border">
+                            <div>
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Documents Issued</span>
+                                <p className="text-2xl font-semibold text-foreground mt-0.5 tabular" style={{ fontFamily: 'var(--font-display)' }}>
+                                    {isLoading ? "—" : assets.length}
+                                </p>
+                            </div>
+                            <div>
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Wallet</span>
+                                <p className="text-[13px] font-mono text-muted-foreground mt-2">
+                                    {address?.slice(0, 10)}…{address?.slice(-6)}
+                                </p>
+                            </div>
                         </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    assets.map((asset, index) => (
-                      <tr key={index} className="border-b last:border-0 hover:bg-slate-50 transition">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2 text-slate-600">
-                            <Clock className="w-4 h-4 opacity-50" />
-                            <span className="font-medium">
-                              {new Date(asset.timestamp * 1000).toLocaleDateString()}
-                            </span>
-                            <span className="text-xs opacity-70">
-                              {new Date(asset.timestamp * 1000).toLocaleTimeString()}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Fingerprint className="w-4 h-4 text-emerald-600 opacity-70" />
-                            <span className="font-mono text-xs bg-slate-100 px-2 py-1 rounded text-slate-700 break-all select-all">
-                              {asset.dataHash}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-1 rounded w-fit border border-emerald-200">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Anchored
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <a
-                            href={`https://amoy.polygonscan.com/tx/${asset.txHash}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded transition"
-                          >
-                            View Tx <ExternalLink className="w-3 h-3" />
-                          </a>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
-  );
+
+                        {/* Table */}
+                        <div className="border border-border rounded-lg overflow-hidden" style={{ background: 'var(--surface-1)' }}>
+                            <table className="w-full text-[13px]">
+                                <thead>
+                                    <tr className="border-b border-border text-left" style={{ background: 'var(--surface-2)' }}>
+                                        <th className="px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Issued</th>
+                                        <th className="px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Document Fingerprint</th>
+                                        <th className="px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider">Status</th>
+                                        <th className="px-4 py-3 font-medium text-muted-foreground text-[11px] uppercase tracking-wider text-right">Tx</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {isLoading ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-4 py-16 text-center text-muted-foreground">
+                                                <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+                                                Syncing…
+                                            </td>
+                                        </tr>
+                                    ) : assets.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-4 py-16 text-center text-muted-foreground">
+                                                <p className="mb-3">No documents issued from this wallet yet.</p>
+                                                <Link href="/issuer">
+                                                    <button
+                                                        className="h-9 px-4 text-[13px] font-semibold rounded-md text-primary-foreground transition-colors duration-150"
+                                                        style={{ background: 'var(--accent-base)' }}
+                                                        onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-hover)')}
+                                                        onMouseLeave={e => (e.currentTarget.style.background = 'var(--accent-base)')}
+                                                    >
+                                                        Issue Your First Document
+                                                    </button>
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        assets.map((asset, index) => (
+                                            <tr key={index} className="border-b border-border/60 last:border-0 hover:bg-foreground/[0.02] transition-colors duration-100">
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className="font-medium text-foreground">
+                                                        {new Date(asset.timestamp * 1000).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                    </span>
+                                                    <span className="text-muted-foreground/60 ml-2 text-[11px]">
+                                                        {new Date(asset.timestamp * 1000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <code className="text-[11px] font-mono text-foreground/80 select-all break-all">
+                                                        {asset.dataHash}
+                                                    </code>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap">
+                                                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                        <CheckCircle2 className="w-3 h-3" />
+                                                        Anchored
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 whitespace-nowrap text-right">
+                                                    <a
+                                                        href={`https://amoy.polygonscan.com/tx/${asset.txHash}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-150"
+                                                    >
+                                                        View <ExternalLink className="w-3 h-3" />
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-4 font-mono">
+                            {assets.length} record{assets.length !== 1 ? 's' : ''} · Filtered by your wallet
+                        </p>
+                    </div>
+                )}
+            </main>
+        </div>
+    );
 }

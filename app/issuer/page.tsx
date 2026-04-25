@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-// Add Link import at the top if missing, though it's likely not. We will add it to the import list.
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ShieldCheck, PenTool, CheckCircle2, X } from "lucide-react";
+import { Loader2, PenTool, CheckCircle2, X, ArrowRight } from "lucide-react";
 import { hashStudentData } from "@/lib/privacy-utils";
 import { attestOnChain } from "@/lib/services/blockchain-service";
 import { useAccount, useConnect, useDisconnect } from "wagmi";
@@ -23,7 +21,6 @@ export default function IssuerPage() {
     const [isProcessingFile, setIsProcessingFile] = useState(false);
     const [fileProcessed, setFileProcessed] = useState(false);
 
-    // Extracted / Manual form data
     const [formData, setFormData] = useState({
         ownerName: "",
         serialNumber: "",
@@ -40,10 +37,7 @@ export default function IssuerPage() {
         setAttestResult(null);
 
         try {
-            console.log("Extracting metadata with Gemini...");
             const metadata = await extractMetadata(file);
-            console.log("Metadata extracted:", metadata);
-
             setFormData({
                 ownerName: metadata.recipientName || "",
                 serialNumber: metadata.recipientId || "",
@@ -54,7 +48,6 @@ export default function IssuerPage() {
         } catch (error: any) {
             console.error("OCR failed:", error);
             alert(`Failed to extract details: ${error.message}\n\nYou can enter them manually.`);
-            // Unlock the form so the user can enter details manually
             setFileProcessed(true);
         } finally {
             setIsProcessingFile(false);
@@ -68,12 +61,11 @@ export default function IssuerPage() {
 
     const handleIssue = async () => {
         if (!isConnected) {
-            alert("Please connect your wallet first! We need it to sign the transaction.");
+            alert("Please connect your wallet first.");
             return;
         }
-
         if (!formData.ownerName || !formData.serialNumber || !formData.modelName) {
-            alert("Please ensure Owner Name, Serial Number, and Model Name are filled out.");
+            alert("Please fill out Owner Name, Serial Number, and Model Name.");
             return;
         }
 
@@ -81,9 +73,6 @@ export default function IssuerPage() {
         setAttestResult(null);
 
         try {
-            // STEP 1: Hash the metadata locally (privacy-preserving)
-            // CRITICAL: We only hash deterministic, normalized data so it can be perfectly re-created during verification.
-            // Using a timestamp here would make it impossible for a Verifier to guess the exact millisecond to reproduce the hash.
             const dataToHash = {
                 ownerName: formData.ownerName.trim().toLowerCase(),
                 serialNumber: formData.serialNumber.trim().toLowerCase(),
@@ -92,17 +81,10 @@ export default function IssuerPage() {
 
             // @ts-ignore - bypassing the strict PrivateStudentData interface for the real Asset schema
             const documentHash = hashStudentData(dataToHash);
-            console.log("Generated private hash:", documentHash);
-
-            // STEP 2: Send hash to smart contract on Polygon Amoy
-            // Using a dummy metadata URI for this demo
             const metadataURI = `ipfs://luxledger-demo-${Date.now()}`;
-            console.log("Sending transaction to blockchain...");
-
             const result = await attestOnChain(documentHash, metadataURI);
             setAttestResult(result);
         } catch (error: any) {
-            console.error(error);
             setAttestResult({ success: false, error: error.message || "Failed to mint attestation." });
         } finally {
             setIsAttesting(false);
@@ -110,135 +92,134 @@ export default function IssuerPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 relative pb-20">
+        <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface-0)' }}>
             <TopNav />
 
-            <main className="max-w-4xl mx-auto px-4 py-8 relative">
-
-                {/* Intro */}
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold font-serif text-slate-900 mb-2">Issue Authenticity Certificate</h1>
-                    <p className="text-slate-500">Upload an asset document. The AI will extract its details, and we will anchor an immutable hash of those details to Polygon Amoy.</p>
+            <main className="flex-1 container max-w-5xl py-12">
+                {/* Page header */}
+                <div className="mb-10 stagger-in" style={{ "--stagger": 0 } as React.CSSProperties}>
+                    <p className="text-[13px] font-medium text-muted-foreground tracking-wide uppercase mb-2">Issuer Portal</p>
+                    <h1 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-semibold tracking-[-0.03em] text-foreground">
+                        Register an Asset
+                    </h1>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Left Column: Form */}
-                    <div className="md:col-span-2 space-y-6">
+                <div className="grid md:grid-cols-[1fr_280px] gap-12">
+                    {/* Left — main form area */}
+                    <div className="space-y-8 stagger-in" style={{ "--stagger": 1 } as React.CSSProperties}>
 
                         {/* Step 1: Upload */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <div className="flex items-center mb-4">
-                                <div className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center mr-3">1</div>
-                                <h2 className="text-lg font-semibold text-slate-800">Scan Asset Document</h2>
+                        <section>
+                            <div className="flex items-baseline gap-3 mb-4">
+                                <span className="text-[11px] font-mono font-semibold text-muted-foreground">01</span>
+                                <h2 className="text-lg font-semibold tracking-tight text-foreground">Scan Document</h2>
                             </div>
-
                             <FileDropZone
                                 onFileSelected={handleFileSelected}
                                 accept="image/*,application/pdf"
                                 maxSizeMB={10}
                             />
-
                             {isProcessingFile && (
-                                <div className="mt-4 flex items-center justify-center text-sm text-slate-500 bg-slate-50 py-3 rounded-lg border border-slate-100">
-                                    <Loader2 className="w-4 h-4 animate-spin mr-2 text-amber-500" />
-                                    AI is reading document via Gemini Flash 2.0...
+                                <div className="mt-3 flex items-center gap-2 text-[13px] text-muted-foreground">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    Extracting with Gemini 2.5 Flash…
                                 </div>
                             )}
-                        </div>
+                        </section>
 
-                        {/* Step 2: Review Data */}
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                            <div className="flex items-center mb-6">
-                                <div className="h-6 w-6 rounded-full bg-amber-100 text-amber-700 font-bold text-xs flex items-center justify-center mr-3">2</div>
-                                <h2 className="text-lg font-semibold text-slate-800">Review & Verify Details</h2>
+                        {/* Step 2: Review */}
+                        <section>
+                            <div className="flex items-baseline gap-3 mb-4">
+                                <span className="text-[11px] font-mono font-semibold text-muted-foreground">02</span>
+                                <h2 className="text-lg font-semibold tracking-tight text-foreground">Review Details</h2>
                             </div>
-
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="ownerName">Owner / Dealer Name</Label>
-                                        <Input id="ownerName" name="ownerName" value={formData.ownerName} onChange={handleInputChange} placeholder="e.g. Vintage Watches Ltd" />
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="ownerName" className="text-[12px] font-medium text-muted-foreground">Owner / Dealer</Label>
+                                        <Input id="ownerName" name="ownerName" value={formData.ownerName} onChange={handleInputChange} placeholder="e.g. Vintage Watches Ltd" className="h-9 text-[13px]" />
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="serialNumber">Serial Number</Label>
-                                        <Input id="serialNumber" name="serialNumber" value={formData.serialNumber} onChange={handleInputChange} placeholder="e.g. SN-89102-X" />
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="serialNumber" className="text-[12px] font-medium text-muted-foreground">Serial Number</Label>
+                                        <Input id="serialNumber" name="serialNumber" value={formData.serialNumber} onChange={handleInputChange} placeholder="e.g. SN-89102-X" className="h-9 text-[13px] font-mono" />
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="modelName">Model / Item Name</Label>
-                                    <Input id="modelName" name="modelName" value={formData.modelName} onChange={handleInputChange} placeholder="e.g. Rolex Submariner Date" />
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="modelName" className="text-[12px] font-medium text-muted-foreground">Model / Item</Label>
+                                    <Input id="modelName" name="modelName" value={formData.modelName} onChange={handleInputChange} placeholder="e.g. Rolex Submariner Date" className="h-9 text-[13px]" />
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="details">Details / Specifications</Label>
-                                    <Input id="details" name="details" value={formData.details} onChange={handleInputChange} placeholder="e.g. Oystersteel, Black Dial, 2024" />
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="details" className="text-[12px] font-medium text-muted-foreground">Details</Label>
+                                    <Input id="details" name="details" value={formData.details} onChange={handleInputChange} placeholder="e.g. Oystersteel, Black Dial, 2024" className="h-9 text-[13px]" />
                                 </div>
                             </div>
+                        </section>
 
-                            {/* Attest Result Alert */}
-                            {attestResult && (
-                                <div className={`mt-6 p-4 rounded-lg border text-sm ${attestResult.success ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
-                                    <div className="flex items-center mb-1">
-                                        {attestResult.success ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <X className="w-4 h-4 mr-2" />}
-                                        <span className="font-semibold">{attestResult.success ? 'Success! Asset Registered On-Chain.' : 'Registration Failed'}</span>
-                                    </div>
-                                    {attestResult.success ? (
-                                        <div className="mt-2 text-xs opacity-90 font-mono break-all pl-6">
-                                            TX: <a href={`https://amoy.polygonscan.com/tx/${attestResult.txHash}`} target="_blank" rel="noreferrer" className="underline hover:text-green-600">{attestResult.txHash}</a>
-                                        </div>
-                                    ) : (
-                                        <div className="mt-1 pl-6 opacity-80">{attestResult.error}</div>
-                                    )}
+                        {/* Result */}
+                        {attestResult && (
+                            <div className={`p-4 rounded-lg border text-[13px] ${
+                                attestResult.success
+                                    ? 'border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-400'
+                                    : 'border-red-500/30 bg-red-500/[0.06] text-red-700 dark:text-red-400'
+                            }`}>
+                                <div className="flex items-center gap-2 font-semibold mb-1">
+                                    {attestResult.success ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                                    {attestResult.success ? 'Registered on-chain' : 'Registration failed'}
                                 </div>
-                            )}
-
-                            {/* Submit Button */}
-                            <Button
-                                onClick={handleIssue}
-                                disabled={isAttesting || !isConnected || !formData.serialNumber}
-                                className="w-full mt-6 bg-amber-600 hover:bg-amber-700 text-white shadow-sm font-medium"
-                                size="lg"
-                            >
-                                {isAttesting ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Mining Transaction...
-                                    </>
+                                {attestResult.success ? (
+                                    <p className="text-[11px] font-mono opacity-80 break-all">
+                                        TX: <a href={`https://amoy.polygonscan.com/tx/${attestResult.txHash}`} target="_blank" rel="noreferrer" className="underline">{attestResult.txHash}</a>
+                                    </p>
                                 ) : (
-                                    <>
-                                        <PenTool className="mr-2 h-4 w-4" /> Issue Certificate (Polygon Amoy)
-                                    </>
+                                    <p className="text-[12px] opacity-80">{attestResult.error}</p>
                                 )}
-                            </Button>
+                            </div>
+                        )}
 
-                            {!isConnected && (
-                                <p className="text-center text-xs text-amber-600 mt-2 font-medium">
-                                    ↑ Connect your wallet above to issue.
-                                </p>
+                        {/* Submit */}
+                        <button
+                            onClick={handleIssue}
+                            disabled={isAttesting || !isConnected || !formData.serialNumber}
+                            className="w-full h-11 rounded-lg text-[14px] font-semibold text-primary-foreground flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                            style={{ background: 'var(--accent-base)' }}
+                            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-hover)' }}
+                            onMouseLeave={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-base)' }}
+                        >
+                            {isAttesting ? (
+                                <><Loader2 className="w-4 h-4 animate-spin" /> Mining Transaction…</>
+                            ) : (
+                                <><PenTool className="w-4 h-4" /> Issue Certificate</>
                             )}
-                        </div>
+                        </button>
+
+                        {!isConnected && (
+                            <p className="text-[12px] text-muted-foreground text-center">
+                                Connect your wallet to sign and broadcast.
+                            </p>
+                        )}
                     </div>
 
-                    {/* Right Column: Helper / Sidebar */}
-                    <div className="space-y-4">
-                        <div className="p-5 bg-white rounded-xl shadow-sm border border-slate-200">
-                            <h3 className="font-semibold text-slate-800 mb-3">How it works</h3>
-                            <ul className="text-sm text-slate-600 space-y-3">
-                                <li className="flex gap-2">
-                                    <div className="text-amber-500 font-bold">1</div>
-                                    <div><strong className="text-slate-800 block">AI Extraction</strong> Upload an invoice or certificate. Gemini reads the details instantly.</div>
-                                </li>
-                                <li className="flex gap-2">
-                                    <div className="text-amber-500 font-bold">2</div>
-                                    <div><strong className="text-slate-800 block">Privacy Hashing</strong> Your data never touches the blockchain raw. It's hashed (SHA256) locally first.</div>
-                                </li>
-                                <li className="flex gap-2">
-                                    <div className="text-amber-500 font-bold">3</div>
-                                    <div><strong className="text-slate-800 block">On-Chain Anchoring</strong> A smart contract on Polygon Amoy stores the hash forever, proving ownership.</div>
-                                </li>
-                            </ul>
+                    {/* Right sidebar — no card, just content */}
+                    <aside className="hidden md:block stagger-in" style={{ "--stagger": 2 } as React.CSSProperties}>
+                        <div className="sticky top-20">
+                            <p className="text-[11px] font-medium text-muted-foreground tracking-wide uppercase mb-5">Process</p>
+                            <div className="space-y-6">
+                                {[
+                                    { num: "01", title: "AI Extraction", desc: "Gemini reads every field from your uploaded document." },
+                                    { num: "02", title: "Local Hashing", desc: "Data is normalized and SHA-256 hashed on your device. Nothing raw leaves the browser." },
+                                    { num: "03", title: "Blockchain Anchor", desc: "Sign a transaction to store the hash on Polygon Amoy — permanently." }
+                                ].map(step => (
+                                    <div key={step.num}>
+                                        <span className="text-[11px] font-mono font-semibold text-muted-foreground">{step.num}</span>
+                                        <h4 className="text-[14px] font-semibold text-foreground mt-0.5 mb-1">{step.title}</h4>
+                                        <p className="text-[12px] text-muted-foreground leading-relaxed">{step.desc}</p>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    </aside>
                 </div>
-            </main >
-        </div >
+            </main>
+        </div>
     );
 }

@@ -36,13 +36,10 @@ export function FileDropZone({
 
     const processFile = (file: File) => {
         setError(null);
-
-        // Size validation
         if (file.size > maxSizeMB * 1024 * 1024) {
-            setError(`File too large. Maximum size is ${maxSizeMB}MB.`);
+            setError(`File exceeds ${maxSizeMB}MB limit.`);
             return;
         }
-
         setSelectedFile(file);
         onFileSelected(file);
     };
@@ -51,7 +48,6 @@ export function FileDropZone({
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
-
         if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
             processFile(e.dataTransfer.files[0]);
         }
@@ -78,13 +74,13 @@ export function FileDropZone({
                 onDrop={handleDrop}
                 onClick={() => inputRef.current?.click()}
                 className={cn(
-                    "relative border-2 border-dashed rounded-xl p-8 transition-all cursor-pointer flex flex-col items-center justify-center text-center",
+                    "relative border border-dashed rounded-lg p-6 transition-all duration-200 cursor-pointer",
                     isDragging
-                        ? "border-amber-500 bg-amber-50/50"
+                        ? "border-foreground/30 bg-foreground/[0.03]"
                         : selectedFile
-                            ? "border-green-500 bg-green-50/30"
-                            : "border-slate-300 hover:border-slate-400 hover:bg-slate-50",
-                    error && "border-red-400 bg-red-50/50"
+                            ? "border-emerald-500/40 bg-emerald-500/[0.04]"
+                            : "border-border hover:border-foreground/20 hover:bg-foreground/[0.02]",
+                    error && "border-red-500/40 bg-red-500/[0.04]"
                 )}
             >
                 <input
@@ -96,47 +92,43 @@ export function FileDropZone({
                 />
 
                 {selectedFile ? (
-                    <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-                        <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center mb-3">
-                            <CheckCircle2 className="h-6 w-6 text-green-600" />
+                    <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-medium text-foreground truncate">
+                                {selectedFile.name}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB — ready for processing
+                            </p>
                         </div>
-                        <p className="font-medium text-slate-900 truncate max-w-[200px]">
-                            {selectedFile.name}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
                         <button
                             onClick={clearFile}
-                            className="absolute top-3 right-3 p-1 rounded-full hover:bg-slate-200 text-slate-500 transition-colors"
+                            className="p-1 rounded hover:bg-foreground/[0.06] text-muted-foreground transition-colors duration-150 shrink-0"
                         >
-                            <X className="h-4 w-4" />
+                            <X className="h-3.5 w-3.5" />
                         </button>
                     </div>
                 ) : (
-                    <div className="flex flex-col items-center">
-                        <div className={cn(
-                            "h-12 w-12 rounded-full flex items-center justify-center mb-4 transition-colors",
-                            isDragging ? "bg-amber-100 text-amber-600" : "bg-slate-100 text-slate-500"
-                        )}>
-                            <UploadCloud className="h-6 w-6" />
-                        </div>
-                        <h3 className="font-semibold text-slate-900 mb-1">
-                            {isDragging ? "Drop file to upload" : "Select or drag file"}
-                        </h3>
-                        <p className="text-sm text-slate-500 mb-4 max-w-xs leading-relaxed">
-                            Upload a high-resolution photo or PDF scan of the asset certificate, receipt, or ID card.
-                        </p>
-                        <div className="flex items-center gap-4 text-xs font-medium text-slate-400">
-                            <div className="flex items-center"><FileType className="w-3 h-3 mr-1" /> PDF, JPG, PNG</div>
-                            <div>Max {maxSizeMB}MB</div>
+                    <div className="flex items-center gap-4">
+                        <UploadCloud className={cn(
+                            "h-5 w-5 shrink-0 transition-colors duration-150",
+                            isDragging ? "text-foreground" : "text-muted-foreground"
+                        )} />
+                        <div>
+                            <p className="text-[13px] font-medium text-foreground">
+                                {isDragging ? "Drop to upload" : "Drop a file or click to browse"}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                PDF, JPG, PNG — up to {maxSizeMB}MB
+                            </p>
                         </div>
                     </div>
                 )}
             </div>
 
             {error && (
-                <p className="text-sm text-red-500 mt-2 text-center animate-in slide-in-from-top-1">
+                <p className="text-[12px] text-red-600 dark:text-red-400 mt-2">
                     {error}
                 </p>
             )}

@@ -1,7 +1,6 @@
 "use client"
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Shield, Upload, CheckCircle, AlertTriangle, Link as LinkIcon, Loader2, FileText, ScanEye, Percent } from "lucide-react";
+import { CheckCircle, AlertTriangle, Loader2, FileText, ScanEye, Percent, ExternalLink, ArrowRight } from "lucide-react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from 'wagmi'
 import { useState } from "react";
@@ -24,7 +23,6 @@ export default function VerifierPage() {
     const [isProcessing, setIsProcessing] = useState(false);
     const [step, setStep] = useState<"UPLOAD" | "OCR" | "AI_CHECK" | "RESULTS">("UPLOAD");
 
-    // Blockchain Verification State
     const [isVerifyingChain, setIsVerifyingChain] = useState(false);
     const [blockchainStatus, setBlockchainStatus] = useState<"IDLE" | "VALID" | "INVALID" | "ERROR">("IDLE");
     const [verificationData, setVerificationData] = useState<VerificationResult | null>(null);
@@ -45,12 +43,10 @@ export default function VerifierPage() {
         setVerificationData(null);
 
         try {
-            // STEP 1: Metadata Extraction (OCR)
             setStep("OCR");
             const data = await extractMetadata(file);
             setMetadata(data);
 
-            // STEP 2: AI Forgery Detection (Strict Scope)
             setStep("AI_CHECK");
             const forgery = await detectForgery(file);
             setForgeryResult(forgery);
@@ -58,7 +54,7 @@ export default function VerifierPage() {
             setStep("RESULTS");
         } catch (error) {
             console.error(error);
-            alert("Analysis Pipeline Failed. See console.");
+            alert("Analysis pipeline failed. See console.");
             setStep("UPLOAD");
         } finally {
             setIsProcessing(false);
@@ -67,17 +63,13 @@ export default function VerifierPage() {
 
     const handleVerifyOnChain = async () => {
         if (!metadata || !forgeryResult) return;
-
-        // STRICT RULE: If forged, do not proceed.
         if (forgeryResult.isForged) {
-            alert("Security Protocol: Blockchain verification blocked due to detected forgery.");
+            alert("Blockchain verification blocked — document failed AI inspection.");
             return;
         }
 
         setIsVerifyingChain(true);
         try {
-            // Reconstruct Data for Hashing
-            // These fields MUST match exactly what the Issuer used when registering (normalized, deterministic).
             const dataToHash = {
                 ownerName: (metadata.recipientName || "").trim().toLowerCase(),
                 serialNumber: (metadata.recipientId || "").trim().toLowerCase(),
@@ -86,17 +78,11 @@ export default function VerifierPage() {
 
             // @ts-ignore
             const hash = hashStudentData(dataToHash);
-            console.log("Verifying Hash:", hash);
-
-            // Verify: search attestation records for this document hash
             const result = await verifyOnChain(hash);
             const isValid = result.isValid;
             setBlockchainStatus(isValid ? "VALID" : "INVALID");
             setVerificationData(isValid ? result : null);
-
-            // Log attempt off-chain (No PII)
             logVerificationAttempt(isValid ? "VALID" : "INVALID");
-
         } catch (error) {
             console.error(error);
             setBlockchainStatus("ERROR");
@@ -106,179 +92,178 @@ export default function VerifierPage() {
     };
 
     return (
-        <div className="flex flex-col min-h-screen">
+        <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface-0)' }}>
             <TopNav />
 
-            <main className="flex-1 container py-12 max-w-4xl mx-auto">
-                <div className="text-center mb-10">
-                    <h1 className="text-3xl font-bold mb-4 font-serif">Luxury Asset Verification</h1>
-                    <p className="text-muted-foreground">
-                        Strict IEEE-aligned prototype. Step 1: Data Extraction. Step 2: AI Forgery Check. Step 3: Blockchain Hash Verification.
+            <main className="flex-1 container max-w-3xl py-12">
+                {/* Page header */}
+                <div className="mb-10 stagger-in" style={{ "--stagger": 0 } as React.CSSProperties}>
+                    <p className="text-[13px] font-medium text-muted-foreground tracking-wide uppercase mb-2">Verification</p>
+                    <h1 className="text-[clamp(1.8rem,3.5vw,2.4rem)] font-semibold tracking-[-0.03em] text-foreground">
+                        Authenticate a Document
+                    </h1>
+                    <p className="text-[15px] text-muted-foreground mt-2 max-w-[55ch]">
+                        AI forgery detection → metadata extraction → blockchain hash verification.
                     </p>
                 </div>
 
-                <div className="bg-white shadow-xl rounded-xl border overflow-hidden">
-                    {step === "UPLOAD" || isProcessing ? (
-                        <div className="p-12 flex flex-col items-center gap-8 min-h-[400px] justify-center">
-                            {isProcessing ? (
-                                <div className="text-center space-y-4">
-                                    <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto" />
-                                    <h3 className="text-xl font-semibold">
-                                        {step === "OCR" && "Extracting Metadata via OCR..."}
-                                        {step === "AI_CHECK" && "AI Detecting Pixel Forgery..."}
-                                    </h3>
-                                    <p className="text-muted-foreground text-sm">Please wait while separate microservices process the document.</p>
+                {step === "UPLOAD" || isProcessing ? (
+                    <div className="stagger-in" style={{ "--stagger": 1 } as React.CSSProperties}>
+                        {isProcessing ? (
+                            <div className="py-20 text-center">
+                                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-foreground/40" />
+                                <p className="text-[15px] font-medium text-foreground">
+                                    {step === "OCR" && "Extracting metadata…"}
+                                    {step === "AI_CHECK" && "Running forgery analysis…"}
+                                </p>
+                                <p className="text-[13px] text-muted-foreground mt-1">This may take a few seconds.</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-6">
+                                <FileDropZone onFileSelected={handleFileSelected} />
+                                <button
+                                    onClick={runAnalysisPipeline}
+                                    disabled={!file}
+                                    className="w-full h-11 rounded-lg text-[14px] font-semibold text-primary-foreground flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                                    style={{ background: 'var(--accent-base)' }}
+                                    onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-hover)' }}
+                                    onMouseLeave={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-base)' }}
+                                >
+                                    Start Verification <ArrowRight className="w-4 h-4" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-8 stagger-in" style={{ "--stagger": 1 } as React.CSSProperties}>
+                        {/* Results header */}
+                        <div className="flex items-center justify-between pb-6 border-b border-border">
+                            <h2 className="text-xl font-semibold tracking-tight text-foreground">Analysis Report</h2>
+                            <button
+                                onClick={() => { setStep("UPLOAD"); setFile(null); }}
+                                className="h-8 px-3 text-[12px] font-medium rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-foreground/[0.04] transition-colors duration-150"
+                            >
+                                New Scan
+                            </button>
+                        </div>
+
+                        {/* Two-column results */}
+                        <div className="grid md:grid-cols-2 gap-8">
+                            {/* AI Forgery */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <ScanEye className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Forgery Analysis</span>
+                                </div>
+                                {forgeryResult?.isForged ? (
+                                    <div className="p-5 rounded-lg border border-red-500/30 bg-red-500/[0.06]">
+                                        <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400 mb-3" />
+                                        <p className="text-[15px] font-semibold text-red-700 dark:text-red-400 mb-1">Forgery Detected</p>
+                                        <p className="text-[13px] text-red-600/80 dark:text-red-400/80">{forgeryResult.reason}</p>
+                                        <p className="text-[11px] font-mono text-red-600/60 dark:text-red-400/60 mt-3">Score: {forgeryResult.confidenceScore}</p>
+                                    </div>
+                                ) : (
+                                    <div className="p-5 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06]">
+                                        <CheckCircle className="h-8 w-8 text-emerald-600 dark:text-emerald-400 mb-3" />
+                                        <p className="text-[15px] font-semibold text-emerald-700 dark:text-emerald-400 mb-1">Visually Authentic</p>
+                                        <p className="text-[13px] text-emerald-600/80 dark:text-emerald-400/80">No pixel manipulation detected.</p>
+                                        <p className="text-[11px] font-mono text-emerald-600/60 dark:text-emerald-400/60 mt-3">Confidence: {forgeryResult?.confidenceScore}</p>
+                                    </div>
+                                )}
+                            </section>
+
+                            {/* Metadata */}
+                            <section>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Extracted Data</span>
+                                </div>
+                                <div className="space-y-4 p-5 rounded-lg border border-border" style={{ background: 'var(--surface-2)' }}>
+                                    {metadata?.ocrConfidence && (
+                                        <div className="flex items-center justify-between pb-3 border-b border-border">
+                                            <span className="text-[11px] text-muted-foreground uppercase font-medium">Confidence</span>
+                                            <span className={`text-[11px] font-semibold font-mono ${metadata.ocrConfidence >= 85 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                {metadata.ocrConfidence}%
+                                            </span>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <span className="text-[11px] text-muted-foreground">Owner</span>
+                                        <p className="text-[15px] font-medium text-foreground">{metadata?.recipientName || "—"}</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <span className="text-[11px] text-muted-foreground">Model</span>
+                                            <p className="text-[13px] font-medium text-foreground">{metadata?.documentType || "—"}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-[11px] text-muted-foreground">Serial</span>
+                                            <p className="text-[13px] font-mono font-medium text-foreground">{metadata?.recipientId || "—"}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+
+                        {/* Blockchain verification */}
+                        <section className="pt-6 border-t border-border">
+                            <div className="flex items-center gap-2 mb-4">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Blockchain Verification</span>
+                            </div>
+
+                            {forgeryResult?.isForged ? (
+                                <div className="p-4 rounded-lg border border-border text-[13px] text-muted-foreground opacity-60" style={{ background: 'var(--surface-2)' }}>
+                                    Blockchain access blocked — document failed forgery inspection.
                                 </div>
                             ) : (
                                 <>
-                                    <FileDropZone
-                                        onFileSelected={handleFileSelected}
-                                        className="max-w-md w-full my-6 bg-white"
-                                    />
-                                    <Button size="lg" onClick={runAnalysisPipeline} disabled={!file} className="w-full max-w-sm">
-                                        Start Verification Pipeline
-                                    </Button>
-                                </>
-                            )}
-                        </div>
-                    ) : (
-                        <div className="p-8 space-y-8 animate-in fade-in zoom-in duration-300">
-                            <div className="flex items-center justify-between border-b pb-6">
-                                <h2 className="text-2xl font-bold">Analysis Report</h2>
-                                <Button variant="outline" onClick={() => { setStep("UPLOAD"); setFile(null); }}>Scan New Document</Button>
-                            </div>
-
-                            <div className="grid md:grid-cols-2 gap-8">
-                                {/* Service 1: AI Forgery Detection */}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <ScanEye className="h-4 w-4 text-purple-600" />
-                                        <h3 className="font-semibold text-muted-foreground uppercase tracking-wider text-xs">AI Forgery Service</h3>
-                                    </div>
-
-                                    {forgeryResult?.isForged ? (
-                                        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-                                            <AlertTriangle className="h-12 w-12 text-red-600 mx-auto mb-3" />
-                                            <h4 className="text-xl font-bold text-red-700">Digital Forgery Detected</h4>
-                                            <p className="text-red-800 text-sm mt-2">{forgeryResult.reason}</p>
-                                            <div className="mt-4 text-xs font-mono bg-red-100 p-1 rounded inline-block">
-                                                Score: {forgeryResult.confidenceScore}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="bg-green-50 border border-green-200 rounded-lg p-6 text-center">
-                                            <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                                            <h4 className="text-xl font-bold text-green-700">Visually Authentic</h4>
-                                            <p className="text-green-800 text-sm mt-2">No pixel manipulation detected.</p>
-                                            <div className="mt-4 text-xs font-mono bg-green-100 p-1 rounded inline-block">
-                                                Confidence: {forgeryResult?.confidenceScore}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Service 2: Metadata Extraction */}
-                                <div>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <FileText className="h-4 w-4 text-blue-600" />
-                                        <h3 className="font-semibold text-muted-foreground uppercase tracking-wider text-xs">Metadata Service (OCR)</h3>
-                                    </div>
-                                    <div className="space-y-4 bg-slate-50 p-6 rounded-lg border">
-
-                                        {/* OCR Confidence Badge */}
-                                        {metadata?.ocrConfidence && (
-                                            <div className="flex items-center justify-between mb-4 pb-4 border-b">
-                                                <span className="text-xs font-semibold text-slate-500 uppercase">Extraction Confidence</span>
-                                                <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center ${metadata.ocrConfidence >= 85 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                    <Percent className="w-3 h-3 mr-1" />
-                                                    {metadata.ocrConfidence}%
-                                                </span>
-                                            </div>
+                                    <button
+                                        onClick={handleVerifyOnChain}
+                                        disabled={isVerifyingChain || blockchainStatus === "VALID"}
+                                        className="w-full h-11 rounded-lg text-[14px] font-semibold text-primary-foreground flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                                        style={{ background: blockchainStatus === "VALID" ? 'var(--surface-2)' : 'var(--accent-base)' }}
+                                        onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--accent-hover)' }}
+                                        onMouseLeave={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = blockchainStatus === "VALID" ? 'var(--surface-2)' : 'var(--accent-base)' }}
+                                    >
+                                        {isVerifyingChain ? (
+                                            <><Loader2 className="w-4 h-4 animate-spin" /> Querying Polygon…</>
+                                        ) : blockchainStatus === "VALID" ? (
+                                            <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-2"><CheckCircle className="w-4 h-4" /> Hash Verified On-Chain</span>
+                                        ) : (
+                                            "Verify on Polygon"
                                         )}
+                                    </button>
 
-                                        <div>
-                                            <label className="text-xs text-slate-500">Asset Owner</label>
-                                            <p className="font-medium text-lg">{metadata?.recipientName || "N/A"}</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs text-slate-500">Model / Type</label>
-                                                <p className="font-medium">{metadata?.documentType || "N/A"}</p>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500">Serial Number</label>
-                                                <p className="font-medium font-mono">{metadata?.recipientId || "N/A"}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Service 3: Blockchain Verification - Gated by AI Result */}
-                            {forgeryResult?.isForged ? (
-                                <div className="pt-6 border-t mt-4 opacity-50 grayscale cursor-not-allowed">
-                                    <h3 className="font-semibold mb-2">Blockchain Verification</h3>
-                                    <div className="bg-slate-100 p-4 rounded border text-slate-500 text-sm">
-                                        🔒 Blockchain access blocked. Document failed AI forgery inspection.
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="pt-6 border-t mt-4">
-                                    <h3 className="font-semibold mb-4">Blockchain Authentication</h3>
-                                    <div className="space-y-4">
-                                        <Button
-                                            onClick={handleVerifyOnChain}
-                                            disabled={isVerifyingChain}
-                                            variant={blockchainStatus === "VALID" ? "outline" : "default"}
-                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
-                                        >
-                                            {isVerifyingChain ? (
-                                                <>
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Querying Polygon Node...
-                                                </>
-                                            ) : blockchainStatus === "VALID" ? (
-                                                <>
-                                                    <CheckCircle className="mr-2 h-4 w-4 text-green-600" /> Hash Anchored On-Chain
-                                                </>
-                                            ) : (
-                                                "Verify Truth on Polygon"
-                                            )}
-                                        </Button>
-                                    </div>
-
-                                    {blockchainStatus === "VALID" && (
-                                        <div className="mt-4 p-5 bg-green-50 text-green-900 rounded-lg border border-green-200">
-                                            <div className="text-center border-b border-green-200 pb-3 mb-3">
-                                                <strong className="text-lg">✅ Immutable Proof Found</strong><br />
-                                                <span className="text-sm">The document extraction matches the cryptographic hash stored on Polygon.</span>
-                                            </div>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex flex-col">
-                                                    <span className="text-green-700 text-xs font-bold uppercase">Anchored By (Issuer Wallet)</span>
-                                                    <span className="font-mono break-all bg-white p-1 rounded mt-1 border border-green-100">{verificationData?.issuer}</span>
+                                    {blockchainStatus === "VALID" && verificationData && (
+                                        <div className="mt-4 p-5 rounded-lg border border-emerald-500/30 bg-emerald-500/[0.06] space-y-3">
+                                            <p className="text-[14px] font-semibold text-emerald-700 dark:text-emerald-400">Immutable proof found</p>
+                                            <p className="text-[13px] text-emerald-600/80 dark:text-emerald-400/80">Document hash matches the on-chain record.</p>
+                                            <div className="space-y-2 pt-3 border-t border-emerald-500/20">
+                                                <div>
+                                                    <span className="text-[11px] text-emerald-600/60 dark:text-emerald-400/60 uppercase font-medium">Issuer Wallet</span>
+                                                    <p className="text-[12px] font-mono text-emerald-700 dark:text-emerald-400 break-all">{verificationData.issuer}</p>
                                                 </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-green-700 text-xs font-bold uppercase">Timestamp</span>
-                                                    <span className="bg-white p-1 rounded mt-1 border border-green-100">
-                                                        {verificationData?.timestamp ? new Date(verificationData.timestamp * 1000).toLocaleString() : "Unknown"}
-                                                    </span>
+                                                <div>
+                                                    <span className="text-[11px] text-emerald-600/60 dark:text-emerald-400/60 uppercase font-medium">Timestamp</span>
+                                                    <p className="text-[12px] text-emerald-700 dark:text-emerald-400">
+                                                        {verificationData.timestamp ? new Date(verificationData.timestamp * 1000).toLocaleString() : "Unknown"}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>
                                     )}
 
                                     {blockchainStatus === "INVALID" && (
-                                        <div className="mt-4 p-4 bg-red-50 text-red-800 rounded border border-red-200 text-center">
-                                            <strong>❌ Hash Mismatch</strong><br />
-                                            Data extraction does not match any anchored hash. Document may be fake or not yet registered.
+                                        <div className="mt-4 p-4 rounded-lg border border-red-500/30 bg-red-500/[0.06] text-center">
+                                            <p className="text-[14px] font-semibold text-red-700 dark:text-red-400">Hash Mismatch</p>
+                                            <p className="text-[13px] text-red-600/80 dark:text-red-400/80 mt-1">No matching record found on-chain. Document may be unregistered or forged.</p>
                                         </div>
                                     )}
-                                </div>
+                                </>
                             )}
-
-                        </div>
-                    )}
-                </div>
+                        </section>
+                    </div>
+                )}
             </main>
         </div>
     );
