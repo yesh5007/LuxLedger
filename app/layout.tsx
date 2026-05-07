@@ -2,22 +2,12 @@ import type React from "react";
 import "./globals.css";
 import type { Metadata } from "next";
 import { cookieToInitialState } from "wagmi";
-import { config, projectId, metadata as WMetadata } from "@/lib/config";
+import { config, projectId } from "@/lib/config";
 import { headers } from "next/headers";
 import WagmiProviderComp from "@/lib/wagmi-provider";
-import { createWeb3Modal } from "@web3modal/wagmi/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme-provider";
 
 if (!projectId) throw new Error("Project ID is not defined");
-
-// Create modal
-createWeb3Modal({
-  metadata: WMetadata,
-  wagmiConfig: config,
-  projectId,
-  enableAnalytics: true, // Optional - defaults to your Cloud configuration
-});
 
 
 export const metadata: Metadata = {

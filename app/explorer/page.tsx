@@ -27,7 +27,7 @@ export default function ExplorerPage() {
         if (result.success && result.assets) {
             setAssets(result.assets);
         } else {
-            console.error("Failed to fetch assets:", result.error);
+            console.warn("Failed to fetch assets:", result.error);
         }
         setIsLoading(false);
     };
@@ -135,7 +135,7 @@ export default function ExplorerPage() {
                             </table>
                         </div>
                         <p className="text-[11px] text-muted-foreground mt-4 font-mono">
-                            {assets.length} record{assets.length !== 1 ? 's' : ''} · Last 100k blocks
+                            {assets.length} record{assets.length !== 1 ? 's' : ''} · Last 1k blocks
                         </p>
                     </div>
                 )}

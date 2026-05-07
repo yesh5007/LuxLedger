@@ -27,7 +27,7 @@ export default function DashboardPage() {
         if (result.success && result.assets) {
             setAssets(result.assets);
         } else {
-            console.error("Failed to fetch dashboard assets:", result.error);
+            console.warn("Failed to fetch dashboard assets:", result.error);
         }
         setIsLoading(false);
     };
@@ -146,14 +146,20 @@ export default function DashboardPage() {
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 whitespace-nowrap text-right">
-                                                    <a
-                                                        href={`https://amoy.polygonscan.com/tx/${asset.txHash}`}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-150"
-                                                    >
-                                                        View <ExternalLink className="w-3 h-3" />
-                                                    </a>
+                                                    {asset.txHash ? (
+                                                        <a
+                                                            href={`https://amoy.polygonscan.com/tx/${asset.txHash}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-150"
+                                                        >
+                                                            View <ExternalLink className="w-3 h-3" />
+                                                        </a>
+                                                    ) : (
+                                                        <span className="text-[11px] font-medium text-muted-foreground/50">
+                                                            N/A
+                                                        </span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))

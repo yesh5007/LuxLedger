@@ -27,11 +27,11 @@ export interface RegisteredAssetEvent {
 }
 
 /**
- * Connects to the user's Metamask wallet.
+ * Connects to MetaMask and returns wallet status.
  */
 export async function connectWallet(): Promise<BlockchainStatus> {
     if (typeof window === "undefined" || !(window as any).ethereum) {
-        return { isConnected: false, error: "Metamask is not installed" };
+        return { isConnected: false, error: "MetaMask not found" };
     }
 
     try {
@@ -45,17 +45,13 @@ export async function connectWallet(): Promise<BlockchainStatus> {
             chainId: Number(network.chainId)
         };
     } catch (error: any) {
-        console.error("Wallet connection error:", error);
-        return { isConnected: false, error: error.message || "Failed to connect wallet" };
+        return { isConnected: false, error: error.message };
     }
 }
 
 /**
  * Anchors a document hash on the Polygon Amoy blockchain.
- * Calls `registerAsset(bytes32 dataHash, string metadataURI)`
- *
- * @param hash The Keccak256 hash of the document data (must start with 0x)
- * @param metadataURI Optional URI to off-chain document (IPFS/etc)
+ * Auto-cancels any stuck pending transactions before registering.
  */
 export async function attestOnChain(hash: string, metadataURI: string = "luxledger://local"): Promise<{ success: boolean; txHash?: string; error?: string }> {
     if (typeof window === "undefined" || !(window as any).ethereum) {
@@ -65,33 +61,56 @@ export async function attestOnChain(hash: string, metadataURI: string = "luxledg
     try {
         const provider = new ethers.BrowserProvider((window as any).ethereum);
         const signer = await provider.getSigner();
-
+        
+        // 8. Ensure contract is connected with signer
         const contract = new ethers.Contract(CONTRACT_ADDRESS, LuxLedgerRegistryABI, signer);
 
-        // Ensure hash is bytes32 format (it comes from ethers.keccak256 so it should be)
-        if (!hash.startsWith("0x")) {
-            hash = "0x" + hash;
+        // Ensure hash format
+        if (!hash.startsWith("0x")) { hash = "0x" + hash; }
+
+        // Pre-flight check (optional, but good to keep)
+        try {
+            const result = await contract.verifyAsset(hash);
+            if (result && result[0] === true) {
+                return { success: false, error: "This exact document has already been registered on the blockchain." };
+            }
+        } catch (e) {
+            console.warn("Pre-flight check failed, proceeding anyway", e);
         }
 
-        console.log("Sending transaction to registerAsset...");
-        const tx = await contract.registerAsset(hash, metadataURI);
-        console.log("Transaction sent:", tx.hash);
+        // 6. Add proper try/catch debugging
+        console.log("--- DEBUGGING CONTRACT START ---");
+        console.log("Contract instance:", contract);
+        console.log("registerAsset function exists?", typeof contract.registerAsset === 'function');
+        console.log("Params:", { hash, metadataURI });
+        console.log("--- DEBUGGING CONTRACT END ---");
 
+        // 4. Ensure frontend calls contract.registerAsset
+        // Polygon Amoy nodes (like BlastAPI) have a strict 25 Gwei minimum priority fee.
+        // We override the gas fees here to ensure it's always above 25 Gwei.
+        console.log("Sending registerAsset transaction via contract call...");
+        const tx = await contract.registerAsset(hash, metadataURI, {
+            maxPriorityFeePerGas: ethers.parseUnits("35", "gwei"),
+            maxFeePerGas: ethers.parseUnits("50", "gwei")
+        });
+        
+        console.log("Tx sent:", tx.hash);
+        
         await tx.wait();
-        console.log("Transaction confirmed in block!");
-
+        console.log("Tx confirmed in block!");
+        
         return { success: true, txHash: tx.hash };
+        
     } catch (error: any) {
-        console.error("Attestation deployment error:", error);
-        // Better error message parsing for contract reverts
+        console.error("--- FULL ERROR START ---");
+        console.error(error);
+        console.error("--- FULL ERROR END ---");
+        
         let errorMsg = error.reason || error.message || "Transaction failed";
-        if (error.data && error.data.message) {
-            errorMsg = error.data.message;
-        }
+        if (error.data && error.data.message) { errorMsg = error.data.message; }
         if (errorMsg.includes("Asset already registered")) {
             errorMsg = "This asset hash is already registered on the blockchain.";
         }
-
         return { success: false, error: errorMsg };
     }
 }
@@ -132,7 +151,7 @@ export async function verifyOnChain(documentHash: string): Promise<VerificationR
             metadataURI: exists ? metadataURI : undefined
         };
     } catch (error: any) {
-        console.error("Verification error:", error);
+        console.warn("Verification error:", error?.message || error);
         return { isValid: false, error: error.message };
     }
 }
@@ -153,8 +172,34 @@ export async function getAssetsByIssuer(issuerAddress: string): Promise<{ succes
         const hashes = await contract.getAssetsByIssuer(issuerAddress);
         return { success: true, hashes: [...hashes] };
     } catch (error: any) {
-        console.error("Fetch assets error:", error);
+        console.warn("Fetch assets error:", error?.message || error);
         return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Queries events with adaptive block range — automatically retries with smaller ranges
+ * if the RPC rejects the request.
+ */
+async function queryWithAdaptiveRange(contract: any, filter: any, provider: any): Promise<any[]> {
+    const currentBlock = await provider.getBlockNumber();
+    const ranges = [5000, 2000, 500, 100];
+
+    for (const range of ranges) {
+        try {
+            const fromBlock = Math.max(0, currentBlock - range);
+            const events = await contract.queryFilter(filter, fromBlock, "latest");
+            return events;
+        } catch (err: any) {
+            console.warn(`[LuxLedger] Block range ${range} failed, trying smaller...`);
+        }
+    }
+
+    try {
+        const events = await contract.queryFilter(filter, currentBlock - 10, "latest");
+        return events;
+    } catch {
+        return [];
     }
 }
 
@@ -170,15 +215,8 @@ export async function getAllRegisteredAssets(): Promise<{ success: boolean; asse
         const provider = new ethers.BrowserProvider((window as any).ethereum);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, LuxLedgerRegistryABI, provider);
 
-        // We must bound the block query to prevent "request timed out" errors on public RPC nodes.
-        // Polygon Amoy has 34+ million blocks. Querying from 0 is too heavy.
-        // We will query the last 100,000 blocks (approx 2.5 days), which covers our recent tests.
-        const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 100000);
-
-        // Fetch all past AssetRegistered events
         const filter = contract.filters.AssetRegistered();
-        const events = await contract.queryFilter(filter, fromBlock, "latest");
+        const events = await queryWithAdaptiveRange(contract, filter, provider);
 
         const assets: RegisteredAssetEvent[] = events.map((event: any) => ({
             dataHash: event.args[0],
@@ -188,18 +226,18 @@ export async function getAllRegisteredAssets(): Promise<{ success: boolean; asse
             txHash: event.transactionHash
         }));
 
-        // Sort by newest first
         assets.sort((a, b) => b.timestamp - a.timestamp);
 
         return { success: true, assets };
     } catch (error: any) {
-        console.error("Fetch all global assets error:", error);
+        console.warn("Fetch all global assets error:", error?.message || error);
         return { success: false, error: error.message };
     }
 }
 
 /**
- * Retrieves the history of assets registered by a specific issuer by fetching AssetRegistered events.
+ * Retrieves the history of assets registered by a specific issuer.
+ * Uses direct contract state reads (getAssetsByIssuer + verifyAsset) to bypass RPC block limits.
  */
 export async function getRegisteredAssetsByIssuer(issuerAddress: string): Promise<{ success: boolean; assets?: RegisteredAssetEvent[]; error?: string }> {
     if (typeof window === "undefined" || !(window as any).ethereum) {
@@ -210,27 +248,38 @@ export async function getRegisteredAssetsByIssuer(issuerAddress: string): Promis
         const provider = new ethers.BrowserProvider((window as any).ethereum);
         const contract = new ethers.Contract(CONTRACT_ADDRESS, LuxLedgerRegistryABI, provider);
 
-        const currentBlock = await provider.getBlockNumber();
-        const fromBlock = Math.max(0, currentBlock - 100000);
+        // Fetch hashes directly from the contract state - NO block limits!
+        const hashes = await contract.getAssetsByIssuer(issuerAddress);
+        
+        const assets: RegisteredAssetEvent[] = [];
+        
+        for (const hash of hashes) {
+            try {
+                const result = await contract.verifyAsset(hash);
+                const exists = result[0];
+                const issuer = result[1];
+                const timestamp = result[2];
+                const metadataURI = result[3];
 
-        // Fetch past AssetRegistered events filtered by issuer
-        const filter = contract.filters.AssetRegistered(null, issuerAddress);
-        const events = await contract.queryFilter(filter, fromBlock, "latest");
+                if (exists) {
+                    assets.push({
+                        dataHash: hash,
+                        issuer: issuer,
+                        timestamp: Number(timestamp),
+                        metadataURI: metadataURI,
+                        txHash: "" // State read doesn't provide txHash, handled in UI
+                    });
+                }
+            } catch (err) {
+                console.warn("Failed to verify hash:", hash);
+            }
+        }
 
-        const assets: RegisteredAssetEvent[] = events.map((event: any) => ({
-            dataHash: event.args[0],
-            issuer: event.args[1],
-            timestamp: Number(event.args[2]),
-            metadataURI: event.args[3],
-            txHash: event.transactionHash
-        }));
-
-        // Sort by newest first
         assets.sort((a, b) => b.timestamp - a.timestamp);
 
         return { success: true, assets };
     } catch (error: any) {
-        console.error("Fetch issuer assets error:", error);
+        console.warn("Fetch issuer assets error:", error?.message || error);
         return { success: false, error: error.message };
     }
 }

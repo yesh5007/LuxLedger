@@ -187,18 +187,34 @@ export default function VerifierPage() {
                                             </span>
                                         </div>
                                     )}
+                                    <p className="text-[11px] text-muted-foreground mb-2">You can edit these fields to ensure they match the issued certificate exactly.</p>
                                     <div>
-                                        <span className="text-[11px] text-muted-foreground">Owner</span>
-                                        <p className="text-[15px] font-medium text-foreground">{metadata?.recipientName || "—"}</p>
+                                        <label className="text-[11px] text-muted-foreground block mb-1">Owner</label>
+                                        <input 
+                                            type="text" 
+                                            value={metadata?.recipientName || ""} 
+                                            onChange={(e) => setMetadata(prev => prev ? {...prev, recipientName: e.target.value} : null)}
+                                            className="w-full bg-transparent border-b border-border/50 pb-1 text-[15px] font-medium text-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+                                        />
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <span className="text-[11px] text-muted-foreground">Model</span>
-                                            <p className="text-[13px] font-medium text-foreground">{metadata?.documentType || "—"}</p>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">Model</label>
+                                            <input 
+                                                type="text" 
+                                                value={metadata?.documentType || ""} 
+                                                onChange={(e) => setMetadata(prev => prev ? {...prev, documentType: e.target.value} : null)}
+                                                className="w-full bg-transparent border-b border-border/50 pb-1 text-[13px] font-medium text-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+                                            />
                                         </div>
                                         <div>
-                                            <span className="text-[11px] text-muted-foreground">Serial</span>
-                                            <p className="text-[13px] font-mono font-medium text-foreground">{metadata?.recipientId || "—"}</p>
+                                            <label className="text-[11px] text-muted-foreground block mb-1">Serial</label>
+                                            <input 
+                                                type="text" 
+                                                value={metadata?.recipientId || ""} 
+                                                onChange={(e) => setMetadata(prev => prev ? {...prev, recipientId: e.target.value} : null)}
+                                                className="w-full bg-transparent border-b border-border/50 pb-1 text-[13px] font-mono font-medium text-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+                                            />
                                         </div>
                                     </div>
                                 </div>

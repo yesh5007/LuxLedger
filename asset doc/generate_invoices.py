@@ -205,10 +205,17 @@ def main():
         {"model": "Rolex Day-Date 40mm President", "price": 38500.00, "dial": "DIA 228238 CHAMPAGNE Luminous", "bezel": "BZL 228238 FLUTED YG", "bracelet": "PRESIDENT 83418 20"},
         {"model": "Rolex Explorer 36mm", "price": 7250.00, "dial": "DIA 124270 BLACK 3-6-9", "bezel": "BZL 124270 SMOOTH SS", "bracelet": "OYSTER 78B00 19"},
         {"model": "Rolex Sea-Dweller Deepsea 44mm", "price": 14150.00, "dial": "DIA 136660 D-BLUE Luminous", "bezel": "BZL 136660 CERACHROM BLK", "bracelet": "OYSTER 98220 22"},
-        {"model": "Rolex Sky-Dweller 42mm", "price": 15650.00, "dial": "DIA 326934 BLUE Luminous", "bezel": "BZL 326934 RING COMMAND WG", "bracelet": "OYSTER 72220 22"}
+        {"model": "Rolex Sky-Dweller 42mm", "price": 15650.00, "dial": "DIA 326934 BLUE Luminous", "bezel": "BZL 326934 RING COMMAND WG", "bracelet": "OYSTER 72220 22"},
+        # New 5 models added
+        {"model": "Rolex Yacht-Master 42", "price": 14050.00, "dial": "DIA 226659 BLACK Luminous", "bezel": "BZL 226659 CERACHROM MATTE", "bracelet": "OYSTERFLEX 350501"},
+        {"model": "Rolex Milgauss 40mm Z-Blue", "price": 9300.00, "dial": "DIA 116400GV Z-BLUE", "bezel": "BZL 116400 SMOOTH SS", "bracelet": "OYSTER 72400 20"},
+        {"model": "Rolex Air-King 40mm", "price": 7450.00, "dial": "DIA 126900 BLACK BLOODHOUND", "bezel": "BZL 126900 SMOOTH SS", "bracelet": "OYSTER 78590 20"},
+        {"model": "Rolex Oyster Perpetual 36", "price": 6100.00, "dial": "DIA 126000 TIFFANY BLUE", "bezel": "BZL 126000 SMOOTH SS", "bracelet": "OYSTER 70200 20"},
+        {"model": "Rolex GMT-Master II 'Batman' 40mm", "price": 10700.00, "dial": "DIA 126710BLNR BLACK", "bezel": "BZL 126710 CERACHROM BLNR", "bracelet": "OYSTER 79200 20"}
     ]
 
-    for i in range(1, 11):
+    # Generate 5 new invoices
+    for i in range(11, 16):
         invoice_number = random.randint(40000, 49999)
         service_no = f"290{random.randint(100000, 999999)}"
         
