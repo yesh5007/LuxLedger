@@ -135,11 +135,9 @@ LuxLedger/
     yarn install
     ```
 
-2.  Establish the environment configuration variables in the root directory:
+2.  Copy `.env.example` to `.env.local` and fill in your own values:
     ```bash
-    # .env.local
-    NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
-    NEXT_PUBLIC_PROJECT_ID=your_walletconnect_project_id
+    cp .env.example .env.local
     ```
 
 3.  Initialize the Next.js development server:
