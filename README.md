@@ -1,9 +1,17 @@
-# LuxLedger: A Verification-First Framework for Luxury Goods Authentication
+# LuxLedger
+
+### AI-Verified Authenticity for Luxury Goods, Anchored On-Chain
+
+LuxLedger stops counterfeit authenticity certificates before they ever reach the blockchain: a Google Gemini 2.5 Flash vision pipeline screens each certificate for digital forgery and tampering, then a deterministic SHA-256 fingerprint of the verified data is anchored immutably on Polygon. The result is a luxury-goods provenance system where trust comes from cryptographic proof, not a logo and a signature — built end-to-end across a Next.js dApp, a custom AI forensics pipeline, and a gas-optimized Solidity registry.
+
+**🔗 Live Demo:** [your-deployment-url-here](#) *(placeholder — will be updated once deployed)*
+
+---
 
 ## Abstract
-Counterfeit products remain a persistent issue in the luxury goods resale market, where authenticity verification often depends on manual inspection or centralized digital records prone to manipulation. This repository contains the reference implementation of **LuxLedger**, a verification-first framework that converges multimodal Artificial Intelligence (AI) and distributed ledger technology to establish an immutable, cryptographically secure proof of authenticity for physical and digital luxury assets. 
+Counterfeit products remain a persistent issue in the luxury goods resale market, where authenticity verification often depends on manual inspection or centralized digital records prone to manipulation. This repository contains the reference implementation of **LuxLedger**, a verification-first framework that converges multimodal Artificial Intelligence (AI) and distributed ledger technology to establish an immutable, cryptographically secure proof of authenticity for physical and digital luxury assets.
 
-By analyzing authenticity certificates for digital forgery prior to blockchain registration, the system addresses the "garbage-in, garbage-out" (GIGO) vulnerability inherent in traditional supply chain ledgers. 
+By analyzing authenticity certificates for digital forgery prior to blockchain registration, the system addresses the "garbage-in, garbage-out" (GIGO) vulnerability inherent in traditional supply chain ledgers.
 
 ## 1. System Architecture
 
@@ -61,7 +69,7 @@ graph TD
 ## 2. Methodology
 
 ### 2.1 The Issuance Protocol
-The issuance protocol allows authorized entities to anchor a new asset to the blockchain. 
+The issuance protocol allows authorized entities to anchor a new asset to the blockchain.
 1.  A physical or digital authenticity certificate is uploaded.
 2.  The Gemini 2.5 Flash AI model extracts critical parameters.
 3.  The client normalizes this data utilizing deterministic alphabetical sorting and generates a privacy-preserving SHA-256 fingerprint.
@@ -82,7 +90,7 @@ The repository is organized following standard Next.js and typical Web3 structur
 LuxLedger/
 ├── app/                        # Next.js App Router root
 │   ├── dashboard/page.tsx      # Connected wallet dashboard
-│   ├── explorer/page.tsx       # Global asset ledger 
+│   ├── explorer/page.tsx       # Global asset ledger
 │   ├── issuer/page.tsx         # Document issuance portal
 │   ├── verifier/page.tsx       # Document verification portal
 │   ├── layout.tsx              # Root HTML + Universal Web3 Providers
